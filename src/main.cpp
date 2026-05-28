@@ -1,59 +1,83 @@
 #include "windowing/WindowController.h"
 #include "windowing/WindowEnumerator.h"
 
+#include "workspace/CanvasTypes.h"
+#include "workspace/ViewportMapper.h"
+#include "workspace/WorkspaceModel.h"
+
 #include <windows.h>
 
+#include <chrono>
 #include <iostream>
+#include <thread>
+
+static RECT getPrimaryWorkArea() {
+    RECT workArea{};
+    SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
+    return workArea;
+}
 
 int main() {
     SetProcessDPIAware();
 
     WindowEnumerator enumerator;
     WindowController controller;
+    WorkspaceModel workspace;
+    ViewportMapper mapper;
+
+    CanvasCamera camera{};
+    camera.x = 0.0;
+    camera.y = 0.0;
+    camera.zoom = 1.0;
 
     const auto windows = enumerator.enumerate();
+    workspace.rebuildFromWindows(windows);
 
-    std::wcout << L"Deskfield window scan\n";
-    std::wcout << L"Found windows: " << windows.size() << L"\n\n";
+    std::wcout << L"Deskfield canvas prototype\n";
+    std::wcout << L"Managed windows: " << workspace.windows().size() << L"\n";
+    std::wcout << L"Use arrow keys to pan. Press Esc to exit.\n";
 
-    for (const auto& window : windows) {
-        const int x = window.rect.left;
-        const int y = window.rect.top;
-        const int width = window.rect.right - window.rect.left;
-        const int height = window.rect.bottom - window.rect.top;
-
-        std::wcout
-            << L"HWND=" << window.hwnd
-            << L" | pid=" << window.processId
-            << L" | class=" << window.className
-            << L" | title=" << window.title
-            << L" | x=" << x
-            << L" y=" << y
-            << L" w=" << width
-            << L" h=" << height
-            << L"\n";
-
-        if (window.className == L"Notepad") {
-            RECT baseRect = controller.getBestWindowRect(window.hwnd);
-
-            const int width = baseRect.right - baseRect.left;
-            const int height = baseRect.bottom - baseRect.top;
-
-            RECT moved{};
-            moved.left = baseRect.left + 100;
-            moved.top = baseRect.top + 200;
-            moved.right = moved.left + width;
-            moved.bottom = moved.top + height;
-
-            std::wcout << L"\nMoving Notepad...\n";
-
-            controller.moveWindow(window.hwnd, moved);
-            controller.bringToForeground(window.hwnd);
-
-            return 0;
+    while (true) {
+        if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
+            break;
         }
+
+        constexpr double panSpeed = 24.0;
+
+        if (GetAsyncKeyState(VK_LEFT) & 0x8000) {
+            camera.x -= panSpeed;
+        }
+
+        if (GetAsyncKeyState(VK_RIGHT) & 0x8000) {
+            camera.x += panSpeed;
+        }
+
+        if (GetAsyncKeyState(VK_UP) & 0x8000) {
+            camera.y -= panSpeed;
+        }
+
+        if (GetAsyncKeyState(VK_DOWN) & 0x8000) {
+            camera.y += panSpeed;
+        }
+
+        const RECT workArea = getPrimaryWorkArea();
+
+        for (const ManagedWindow& window : workspace.windows()) {
+            if (window.hwnd == nullptr || !IsWindow(window.hwnd)) {
+                continue;
+            }
+
+            const RECT screenRect = mapper.mapCanvasToScreen(
+                window.canvasRect,
+                camera,
+                workArea
+            );
+
+            controller.moveWindow(window.hwnd, screenRect);
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 
-    std::wcout << L"\nNotepad was not found.\n";
     return 0;
 }

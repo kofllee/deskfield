@@ -9,6 +9,8 @@ add_executable(Deskfield
         src/main.cpp
         src/windowing/WindowEnumerator.cpp
         src/windowing/WindowController.cpp
+        src/workspace/ViewportMapper.cpp
+        src/workspace/WorkspaceModel.cpp
 )
 
 target_include_directories(Deskfield PRIVATE
