@@ -8,6 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(Deskfield
         src/main.cpp
         src/windowing/WindowEnumerator.cpp
+        src/windowing/WindowController.cpp
 )
 
 target_include_directories(Deskfield PRIVATE
@@ -22,4 +23,5 @@ target_compile_definitions(Deskfield PRIVATE
 
 target_link_libraries(Deskfield PRIVATE
         user32
+        dwmapi
 )
