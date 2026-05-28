@@ -1,0 +1,48 @@
+# Build folders
+cmake-build-*/
+build/
+out/
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+
+# CLion / JetBrains
+.idea/
+*.iml
+
+# Visual Studio / MSVC
+.vs/
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+x64/
+x86/
+Debug/
+Release/
+RelWithDebInfo/
+MinSizeRel/
+
+# Binaries
+*.exe
+*.dll
+*.lib
+*.pdb
+*.obj
+*.ilk
+*.exp
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local config
+.env
+*.local
