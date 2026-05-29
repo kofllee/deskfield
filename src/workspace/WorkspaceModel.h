@@ -4,7 +4,6 @@
 #include "windowing/WindowInfo.h"
 
 #include <windows.h>
-
 #include <vector>
 
 enum class ManagedWindowState {
@@ -16,6 +15,11 @@ enum class ManagedWindowState {
 
 struct ManagedWindow {
     HWND hwnd{};
+
+    std::wstring title{};
+    std::wstring className{};
+    DWORD processId{};
+
     CanvasRect canvasRect{};
     CanvasRect savedNormalRect{};
 
@@ -42,4 +46,5 @@ private:
 
     static bool containsWindow(const std::vector<WindowInfo>& windows, HWND hwnd);
     static CanvasRect makeInitialCanvasRect(const WindowInfo& window, const CanvasCamera& camera);
+    static ManagedWindow makeManagedWindow(const WindowInfo& window, const CanvasCamera& camera);
 };

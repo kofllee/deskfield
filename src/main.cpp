@@ -5,6 +5,7 @@
 #include "workspace/ViewportMapper.h"
 #include "workspace/WorkspaceModel.h"
 #include "features/LayoutApplier.h"
+#include "overlay/OverlayWindow.h"
 
 #include <windows.h>
 
@@ -26,6 +27,14 @@ int main() {
     WorkspaceModel workspace;
     ViewportMapper mapper;
     LayoutApplier layoutApplier;
+    OverlayWindow overlay;
+
+    if (!overlay.create(getPrimaryWorkArea())) {
+        std::wcout << L"Failed to create overlay. Error: " << GetLastError() << L"\n";
+        return 1;
+    }
+
+    overlay.show();
 
     CanvasCamera camera{};
     camera.x = 0.0;
@@ -47,19 +56,19 @@ int main() {
         constexpr double panSpeed = 24.0;
 
         if (GetAsyncKeyState(VK_LEFT) & 0x8000) {
-            camera.x += panSpeed;
-        }
-
-        if (GetAsyncKeyState(VK_RIGHT) & 0x8000) {
             camera.x -= panSpeed;
         }
 
+        if (GetAsyncKeyState(VK_RIGHT) & 0x8000) {
+            camera.x += panSpeed;
+        }
+
         if (GetAsyncKeyState(VK_UP) & 0x8000) {
-            camera.y += panSpeed;
+            camera.y -= panSpeed;
         }
 
         if (GetAsyncKeyState(VK_DOWN) & 0x8000) {
-            camera.y -= panSpeed;
+            camera.y += panSpeed;
         }
 
         static int syncCounter = 0;
@@ -75,6 +84,20 @@ int main() {
         const RECT workArea = getPrimaryWorkArea();
 
         layoutApplier.apply(workspace, camera, workArea, mapper, controller);
+
+        overlay.setSnapshot(&workspace, camera, getPrimaryWorkArea());
+        overlay.repaint();
+
+        MSG msg{};
+        while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+            if (msg.message == WM_QUIT) {
+                return 0;
+            }
+
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 

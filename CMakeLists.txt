@@ -8,13 +8,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(Deskfield
         src/main.cpp
 
-        src/windowing/WindowController.cpp
         src/windowing/WindowEnumerator.cpp
+        src/windowing/WindowEnumerator.h
+        src/windowing/WindowController.cpp
+        src/windowing/WindowController.h
 
-        src/workspace/ViewportMapper.cpp
+        src/workspace/CanvasTypes.h
         src/workspace/WorkspaceModel.cpp
+        src/workspace/WorkspaceModel.h
+        src/workspace/ViewportMapper.cpp
+        src/workspace/ViewportMapper.h
 
         src/features/LayoutApplier.cpp
+        src/features/LayoutApplier.h
+
+        src/overlay/OverlayWindow.cpp
+        src/overlay/OverlayWindow.h
 )
 
 target_include_directories(Deskfield PRIVATE
