@@ -27,9 +27,45 @@ void WorkspaceModel::syncFromWindows(const std::vector<WindowInfo> &windows, con
 
         ManagedWindow managed{};
         managed.hwnd = window.hwnd;
-        managed.canvasRect = rectToCanvasRect(window.rect);
+        managed.canvasRect = makeInitialCanvasRect(window, camera);
 
         windows_.push_back(managed);
+    }
+}
+
+void WorkspaceModel::updateNativeState(const std::vector<WindowInfo> &windows) {
+    for (ManagedWindow& managed : windows_) {
+        const auto it = std::find_if(windows.begin(), windows.end(), [&](const WindowInfo& window) { return window.hwnd == managed.hwnd; });
+
+        if (it == windows.end()) {
+            continue;
+        }
+
+        const auto& window = *it;
+
+        if (window.minimized) {
+            managed.state = ManagedWindowState::Minimized;
+            managed.wasMinimized = true;
+            continue;
+        }
+
+        if (window.maximized) {
+            if (!managed.wasMaximized) {
+                managed.savedNormalRect = managed.canvasRect;
+            }
+
+            managed.state = ManagedWindowState::Maximized;
+            managed.wasMaximized = true;
+            continue;
+        }
+
+        if (managed.wasMaximized) {
+            managed.canvasRect = managed.savedNormalRect;
+        }
+
+        managed.state = ManagedWindowState::Normal;
+        managed.wasMinimized = false;
+        managed.wasMaximized = false;
     }
 }
 

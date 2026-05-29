@@ -62,11 +62,12 @@ int main() {
 
         static int syncCounter = 0;
 
-        if (++syncCounter >= 30) {
+        if (++syncCounter >= 15) {
             syncCounter = 0;
 
             const auto currentWindows = enumerator.enumerate();
             workspace.syncFromWindows(currentWindows, camera);
+            workspace.updateNativeState(currentWindows);
         }
 
         const RECT workArea = getPrimaryWorkArea();
@@ -76,7 +77,7 @@ int main() {
                 continue;
             }
 
-            if (IsIconic(window.hwnd) || IsZoomed(window.hwnd)) {
+            if (window.state != ManagedWindowState::Normal) {
                 continue;
             }
 

@@ -7,15 +7,29 @@
 
 #include <vector>
 
+enum class ManagedWindowState {
+    Normal,
+    Minimized,
+    Maximized,
+    Hidden
+};
+
 struct ManagedWindow {
     HWND hwnd{};
     CanvasRect canvasRect{};
+    CanvasRect savedNormalRect{};
+
+    ManagedWindowState state{ManagedWindowState::Normal};
+
+    bool wasMinimized{};
+    bool wasMaximized{};
 };
 
 class WorkspaceModel {
 public:
     void rebuildFromWindows(const std::vector<WindowInfo>& windows);
     void syncFromWindows(const std::vector<WindowInfo>& windows, const CanvasCamera& camera);
+    void updateNativeState(const std::vector<WindowInfo>& windows);
 
     std::vector<ManagedWindow> &windows();
     const std::vector<ManagedWindow> &windows() const;
