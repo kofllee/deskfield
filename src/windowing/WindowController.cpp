@@ -25,6 +25,10 @@ bool WindowController::moveWindow(HWND hwnd, const RECT& rect) const {
         return false;
     }
 
+    if (IsIconic(hwnd) || IsZoomed(hwnd)) {
+        return false;
+    }
+
     const int x = rect.left;
     const int y = rect.top;
     const int w = rect.right - rect.left;
@@ -34,20 +38,20 @@ bool WindowController::moveWindow(HWND hwnd, const RECT& rect) const {
         return false;
     }
 
-    restoreWindow(hwnd);
-
     const BOOL result = SetWindowPos(
         hwnd,
-        HWND_TOP,
+        nullptr,
         x,
         y,
         w,
         h,
-        SWP_SHOWWINDOW | SWP_ASYNCWINDOWPOS
+        SWP_NOZORDER |
+        SWP_NOACTIVATE |
+        SWP_NOOWNERZORDER |
+        SWP_ASYNCWINDOWPOS
     );
 
-
-    return result;
+    return result != FALSE;
 }
 
 bool WindowController::bringToForeground(HWND hwnd) const {

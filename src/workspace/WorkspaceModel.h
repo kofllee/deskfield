@@ -15,10 +15,17 @@ struct ManagedWindow {
 class WorkspaceModel {
 public:
     void rebuildFromWindows(const std::vector<WindowInfo>& windows);
+    void syncFromWindows(const std::vector<WindowInfo>& windows, const CanvasCamera& camera);
 
     std::vector<ManagedWindow> &windows();
     const std::vector<ManagedWindow> &windows() const;
 
 private:
     std::vector<ManagedWindow> windows_;
+
+    ManagedWindow* findByHwnd(HWND hwnd);
+    const ManagedWindow* findByHwnd(HWND hwnd) const;
+
+    static bool containsWindow(const std::vector<WindowInfo>& windows, HWND hwnd);
+    static CanvasRect makeInitialCanvasRect(const WindowInfo& window, const CanvasCamera& camera);
 };

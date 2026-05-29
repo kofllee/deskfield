@@ -45,25 +45,38 @@ int main() {
         constexpr double panSpeed = 24.0;
 
         if (GetAsyncKeyState(VK_LEFT) & 0x8000) {
-            camera.x -= panSpeed;
-        }
-
-        if (GetAsyncKeyState(VK_RIGHT) & 0x8000) {
             camera.x += panSpeed;
         }
 
+        if (GetAsyncKeyState(VK_RIGHT) & 0x8000) {
+            camera.x -= panSpeed;
+        }
+
         if (GetAsyncKeyState(VK_UP) & 0x8000) {
-            camera.y -= panSpeed;
+            camera.y += panSpeed;
         }
 
         if (GetAsyncKeyState(VK_DOWN) & 0x8000) {
-            camera.y += panSpeed;
+            camera.y -= panSpeed;
+        }
+
+        static int syncCounter = 0;
+
+        if (++syncCounter >= 30) {
+            syncCounter = 0;
+
+            const auto currentWindows = enumerator.enumerate();
+            workspace.syncFromWindows(currentWindows, camera);
         }
 
         const RECT workArea = getPrimaryWorkArea();
 
         for (const ManagedWindow& window : workspace.windows()) {
             if (window.hwnd == nullptr || !IsWindow(window.hwnd)) {
+                continue;
+            }
+
+            if (IsIconic(window.hwnd) || IsZoomed(window.hwnd)) {
                 continue;
             }
 
