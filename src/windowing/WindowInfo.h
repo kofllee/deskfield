@@ -8,6 +8,7 @@ struct WindowInfo {
     DWORD processId{};
 
     RECT rect{};
+    RECT normalRect{};
 
     std::wstring title;
     std::wstring className;

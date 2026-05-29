@@ -23,6 +23,16 @@ BOOL CALLBACK WindowEnumerator::enumWindowsCallback(HWND hwnd, LPARAM lParam) {
     info.className = getWindowClassName(hwnd);
 
     GetWindowRect(hwnd, &info.rect);
+    
+    info.normalRect = info.rect;
+
+    WINDOWPLACEMENT placement{};
+    placement.length = sizeof(WINDOWPLACEMENT);
+
+    if (GetWindowPlacement(hwnd, &placement)) {
+        info.normalRect = placement.rcNormalPosition;
+    }
+
     GetWindowThreadProcessId(hwnd, &info.processId);
 
     info.visible = IsWindowVisible(hwnd) != FALSE;

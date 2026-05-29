@@ -8,7 +8,7 @@ void WorkspaceModel::rebuildFromWindows(const std::vector<WindowInfo>& windows) 
     for (const WindowInfo& window : windows) {
         ManagedWindow managed{};
         managed.hwnd = window.hwnd;
-        managed.canvasRect = rectToCanvasRect(window.rect);
+        managed.canvasRect = rectToCanvasRect(window.normalRect);
 
         windows_.push_back(managed);
     }
@@ -102,7 +102,7 @@ bool WorkspaceModel::containsWindow(const std::vector<WindowInfo>& windows, HWND
 }
 
 CanvasRect WorkspaceModel::makeInitialCanvasRect(const WindowInfo &window, const CanvasCamera &camera) {
-    CanvasRect rect = rectToCanvasRect(window.rect);
+    CanvasRect rect = rectToCanvasRect(window.normalRect);
 
     rect.x += camera.x;
     rect.y += camera.y;

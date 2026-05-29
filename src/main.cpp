@@ -4,6 +4,7 @@
 #include "workspace/CanvasTypes.h"
 #include "workspace/ViewportMapper.h"
 #include "workspace/WorkspaceModel.h"
+#include "features/LayoutApplier.h"
 
 #include <windows.h>
 
@@ -24,6 +25,7 @@ int main() {
     WindowController controller;
     WorkspaceModel workspace;
     ViewportMapper mapper;
+    LayoutApplier layoutApplier;
 
     CanvasCamera camera{};
     camera.x = 0.0;
@@ -62,34 +64,17 @@ int main() {
 
         static int syncCounter = 0;
 
+        const auto currentWindows = enumerator.enumerate();
+        workspace.updateNativeState(currentWindows);
+
         if (++syncCounter >= 15) {
             syncCounter = 0;
-
-            const auto currentWindows = enumerator.enumerate();
             workspace.syncFromWindows(currentWindows, camera);
-            workspace.updateNativeState(currentWindows);
         }
 
         const RECT workArea = getPrimaryWorkArea();
 
-        for (const ManagedWindow& window : workspace.windows()) {
-            if (window.hwnd == nullptr || !IsWindow(window.hwnd)) {
-                continue;
-            }
-
-            if (window.state != ManagedWindowState::Normal) {
-                continue;
-            }
-
-            const RECT screenRect = mapper.mapCanvasToScreen(
-                window.canvasRect,
-                camera,
-                workArea
-            );
-
-            controller.moveWindow(window.hwnd, screenRect);
-        }
-
+        layoutApplier.apply(workspace, camera, workArea, mapper, controller);
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 
