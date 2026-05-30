@@ -24,6 +24,9 @@ add_executable(Deskfield
 
         src/overlay/OverlayWindow.cpp
         src/overlay/OverlayWindow.h
+        src/app/DeskfieldMode.h
+        src/workspace/CanvasCameraController.cpp
+        src/workspace/CanvasCameraController.h
 )
 
 target_include_directories(Deskfield PRIVATE

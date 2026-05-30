@@ -13,6 +13,10 @@ struct CanvasCamera {
     double x{};
     double y{};
     double zoom{1.0};
+
+    double targetX{};
+    double targetY{};
+    double targetZoom{1.0};
 };
 
 inline CanvasRect rectToCanvasRect(const RECT& rect) {

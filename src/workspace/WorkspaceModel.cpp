@@ -124,7 +124,7 @@ bool WorkspaceModel::containsWindow(const std::vector<WindowInfo>& windows, HWND
 }
 
 CanvasRect WorkspaceModel::makeInitialCanvasRect(const WindowInfo &window, const CanvasCamera &camera) {
-    CanvasRect rect = rectToCanvasRect(window.rect);
+    CanvasRect rect = rectToCanvasRect(window.normalRect);
 
     rect.x += camera.x;
     rect.y += camera.y;
