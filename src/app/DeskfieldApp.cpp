@@ -24,7 +24,10 @@ bool DeskfieldApp::initialize() {
     auto windows = enumerator_.enumerate();
     windowStateTracker_.update(std::move(windows));
 
-    workspace_.rebuildFromWindows(windowStateTracker_.current());
+    workspace_.rebuildFromWindows(
+        windowStateTracker_.current(),
+        windowRegistry_
+    );
 
     return true;
 }
@@ -120,7 +123,11 @@ void DeskfieldApp::syncWindows() {
 
     if (++syncCounter_ >= 15) {
         syncCounter_ = 0;
-        workspace_.syncFromWindows(windowStateTracker_.current(), camera_);
+        workspace_.syncFromWindows(
+            windowStateTracker_.current(),
+            camera_,
+            windowRegistry_
+        );
     }
 }
 

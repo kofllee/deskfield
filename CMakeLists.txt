@@ -31,6 +31,9 @@ add_executable(Deskfield
         src/app/DeskfieldApp.h
         src/windowing/WindowStateTracker.cpp
         src/windowing/WindowStateTracker.h
+        src/workspace/WindowId.h
+        src/workspace/WindowRegistry.cpp
+        src/workspace/WindowRegistry.h
 )
 
 target_include_directories(Deskfield PRIVATE

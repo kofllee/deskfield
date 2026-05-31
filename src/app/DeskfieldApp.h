@@ -12,6 +12,7 @@
 #include "workspace/CanvasTypes.h"
 #include "workspace/ViewportMapper.h"
 #include "workspace/WorkspaceModel.h"
+#include "workspace/WindowRegistry.h"
 
 #include <windows.h>
 
@@ -38,8 +39,11 @@ private:
     WindowEnumerator enumerator_{};
     WindowStateTracker windowStateTracker_{};
     WindowController controller_{};
+
     WorkspaceModel workspace_{};
+    WindowRegistry windowRegistry_{};
     ViewportMapper mapper_{};
+
     NativeLayoutSynchronizer nativeLayoutSynchronizer_{};
     OverlayWindow overlay_{};
     CanvasCameraController cameraController_{};

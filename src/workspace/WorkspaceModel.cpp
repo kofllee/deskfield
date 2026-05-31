@@ -2,7 +2,10 @@
 
 #include <algorithm>
 
-void WorkspaceModel::rebuildFromWindows(const std::vector<WindowSnapshot>& windows) {
+void WorkspaceModel::rebuildFromWindows(
+    const std::vector<WindowSnapshot>& windows,
+    WindowRegistry& registry
+) {
     windows_.clear();
 
     CanvasCamera camera{};
@@ -11,19 +14,31 @@ void WorkspaceModel::rebuildFromWindows(const std::vector<WindowSnapshot>& windo
     camera.zoom = 1.0;
 
     for (const WindowSnapshot& window : windows) {
-        windows_.push_back(makeManagedWindow(window, camera));
+        const WindowId id = registry.getOrCreate(window.hwnd);
+        windows_.push_back(makeManagedWindow(window, camera, id));
     }
 }
 
-void WorkspaceModel::syncFromWindows(const std::vector<WindowSnapshot> &windows, const CanvasCamera &camera) {
+void WorkspaceModel::syncFromWindows(
+    const std::vector<WindowSnapshot>& windows,
+    const CanvasCamera& camera,
+    WindowRegistry& registry
+) {
     windows_.erase(
         std::remove_if(
             windows_.begin(),
             windows_.end(),
             [&](const ManagedWindow& managed) {
-                return managed.hwnd == nullptr ||
-                       !IsWindow(managed.hwnd) ||
-                       !containsWindow(windows, managed.hwnd);
+                const bool shouldRemove =
+                    managed.hwnd == nullptr ||
+                    !IsWindow(managed.hwnd) ||
+                    !containsWindow(windows, managed.hwnd);
+
+                if (shouldRemove) {
+                    registry.remove(managed.hwnd);
+                }
+
+                return shouldRemove;
             }
         ),
         windows_.end()
@@ -39,9 +54,9 @@ void WorkspaceModel::syncFromWindows(const std::vector<WindowSnapshot> &windows,
             continue;
         }
 
-        windows_.push_back(makeManagedWindow(window, camera));
+        const WindowId id = registry.getOrCreate(window.hwnd);
+        windows_.push_back(makeManagedWindow(window, camera, id));
     }
-
 }
 
 void WorkspaceModel::updateNativeState(const std::vector<WindowSnapshot>& windows) {
@@ -91,9 +106,13 @@ void WorkspaceModel::updateNativeState(const std::vector<WindowSnapshot>& window
     }
 }
 
-std::vector<ManagedWindow>& WorkspaceModel::windows() { return windows_; }
+std::vector<ManagedWindow>& WorkspaceModel::windows() {
+    return windows_;
+}
 
-const std::vector<ManagedWindow>& WorkspaceModel::windows() const { return windows_; }
+const std::vector<ManagedWindow>& WorkspaceModel::windows() const {
+    return windows_;
+}
 
 ManagedWindow* WorkspaceModel::findByHwnd(HWND hwnd) {
     const auto it = std::find_if(
@@ -119,11 +138,23 @@ const ManagedWindow* WorkspaceModel::findByHwnd(HWND hwnd) const {
     return it == windows_.end() ? nullptr : &*it;
 }
 
-bool WorkspaceModel::containsWindow(const std::vector<WindowSnapshot>& windows, HWND hwnd) {
-    return std::any_of(windows.begin(), windows.end(), [hwnd](const WindowSnapshot& window) { return window.hwnd == hwnd; });
+bool WorkspaceModel::containsWindow(
+    const std::vector<WindowSnapshot>& windows,
+    HWND hwnd
+) {
+    return std::any_of(
+        windows.begin(),
+        windows.end(),
+        [hwnd](const WindowSnapshot& window) {
+            return window.hwnd == hwnd;
+        }
+    );
 }
 
-CanvasRect WorkspaceModel::makeInitialCanvasRect(const WindowSnapshot &window, const CanvasCamera &camera) {
+CanvasRect WorkspaceModel::makeInitialCanvasRect(
+    const WindowSnapshot& window,
+    const CanvasCamera& camera
+) {
     CanvasRect rect = rectToCanvasRect(window.normalRect);
 
     rect.x += camera.x;
@@ -132,9 +163,14 @@ CanvasRect WorkspaceModel::makeInitialCanvasRect(const WindowSnapshot &window, c
     return rect;
 }
 
-ManagedWindow WorkspaceModel::makeManagedWindow(const WindowSnapshot& window, const CanvasCamera& camera) {
+ManagedWindow WorkspaceModel::makeManagedWindow(
+    const WindowSnapshot& window,
+    const CanvasCamera& camera,
+    WindowId id
+) {
     ManagedWindow managed{};
 
+    managed.id = id;
     managed.hwnd = window.hwnd;
 
     managed.title = window.title;
@@ -157,5 +193,3 @@ ManagedWindow WorkspaceModel::makeManagedWindow(const WindowSnapshot& window, co
 
     return managed;
 }
-
-
