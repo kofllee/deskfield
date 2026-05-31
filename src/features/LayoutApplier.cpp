@@ -16,19 +16,25 @@ bool LayoutApplier::shouldApplyWindow(const ManagedWindow& window) {
     return true;
 }
 
-void LayoutApplier::apply(const WorkspaceModel &workspace, const CanvasCamera &camera, const RECT &workArea, const ViewportMapper &mapper, const WindowController &controller) const {
+void LayoutApplier::apply(
+    const WorkspaceModel& workspace,
+    const CanvasCamera& camera,
+    const RECT& workArea,
+    const ViewportMapper& mapper,
+    const WindowController& controller
+) const {
     for (const auto& window : workspace.windows()) {
         if (!shouldApplyWindow(window)) {
             continue;
         }
 
-        const RECT screenRect = mapper.mapCanvasToScreen(
+        const RECT nativeRect = mapper.mapCanvasToNativeRect(
             window.canvasRect,
             camera,
             workArea
         );
 
-        controller.moveWindow(window.hwnd, screenRect);
+        controller.moveWindow(window.hwnd, nativeRect);
     }
 }
 
