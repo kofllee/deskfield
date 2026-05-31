@@ -4,8 +4,8 @@
 
 #include <array>
 
-std::vector<WindowInfo> WindowEnumerator::enumerate() const {
-    std::vector<WindowInfo> windows;
+std::vector<WindowSnapshot> WindowEnumerator::enumerate() const {
+    std::vector<WindowSnapshot> windows;
 
     EnumWindows(enumWindowsCallback, reinterpret_cast<LPARAM>(&windows));
 
@@ -13,11 +13,11 @@ std::vector<WindowInfo> WindowEnumerator::enumerate() const {
 }
 
 BOOL CALLBACK WindowEnumerator::enumWindowsCallback(HWND hwnd, LPARAM lParam) {
-    auto* windows = reinterpret_cast<std::vector<WindowInfo>*>(lParam);
+    auto* windows = reinterpret_cast<std::vector<WindowSnapshot>*>(lParam);
 
     if (!isManageableWindow(hwnd)) return TRUE;
 
-    WindowInfo info;
+    WindowSnapshot info;
     info.hwnd = hwnd;
     info.title = getWindowTitle(hwnd);
     info.className = getWindowClassName(hwnd);

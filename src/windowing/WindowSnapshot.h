@@ -3,7 +3,7 @@
 #include <windows.h>
 #include <string>
 
-struct WindowInfo {
+struct WindowSnapshot {
     HWND hwnd{};
     DWORD processId{};
 

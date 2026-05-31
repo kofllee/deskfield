@@ -29,6 +29,8 @@ add_executable(Deskfield
         src/workspace/CanvasCameraController.h
         src/app/DeskfieldApp.cpp
         src/app/DeskfieldApp.h
+        src/windowing/WindowStateTracker.cpp
+        src/windowing/WindowStateTracker.h
 )
 
 target_include_directories(Deskfield PRIVATE

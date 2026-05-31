@@ -1,12 +1,12 @@
 #pragma once
 
-#include "WindowInfo.h"
+#include "WindowSnapshot.h"
 
 #include <vector>
 
 class WindowEnumerator {
 public:
-    std::vector<WindowInfo> enumerate() const;
+    std::vector<WindowSnapshot> enumerate() const;
 
 private:
     static BOOL CALLBACK enumWindowsCallback(HWND hwnd, LPARAM lParam);

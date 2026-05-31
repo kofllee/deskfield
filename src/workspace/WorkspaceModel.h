@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CanvasTypes.h"
-#include "windowing/WindowInfo.h"
+#include "windowing/WindowSnapshot.h"
 
 #include <windows.h>
 #include <vector>
@@ -31,9 +31,9 @@ struct ManagedWindow {
 
 class WorkspaceModel {
 public:
-    void rebuildFromWindows(const std::vector<WindowInfo>& windows);
-    void syncFromWindows(const std::vector<WindowInfo>& windows, const CanvasCamera& camera);
-    void updateNativeState(const std::vector<WindowInfo>& windows);
+    void rebuildFromWindows(const std::vector<WindowSnapshot>& windows);
+    void syncFromWindows(const std::vector<WindowSnapshot>& windows, const CanvasCamera& camera);
+    void updateNativeState(const std::vector<WindowSnapshot>& windows);
 
     std::vector<ManagedWindow> &windows();
     const std::vector<ManagedWindow> &windows() const;
@@ -44,7 +44,7 @@ private:
     ManagedWindow* findByHwnd(HWND hwnd);
     const ManagedWindow* findByHwnd(HWND hwnd) const;
 
-    static bool containsWindow(const std::vector<WindowInfo>& windows, HWND hwnd);
-    static CanvasRect makeInitialCanvasRect(const WindowInfo& window, const CanvasCamera& camera);
-    static ManagedWindow makeManagedWindow(const WindowInfo& window, const CanvasCamera& camera);
+    static bool containsWindow(const std::vector<WindowSnapshot>& windows, HWND hwnd);
+    static CanvasRect makeInitialCanvasRect(const WindowSnapshot& window, const CanvasCamera& camera);
+    static ManagedWindow makeManagedWindow(const WindowSnapshot& window, const CanvasCamera& camera);
 };

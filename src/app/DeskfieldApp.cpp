@@ -21,8 +21,10 @@ bool DeskfieldApp::initialize() {
 
     cameraController_.resetTargets(camera_);
 
-    const auto windows = enumerator_.enumerate();
-    workspace_.rebuildFromWindows(windows);
+    auto windows = enumerator_.enumerate();
+    windowStateTracker_.update(std::move(windows));
+
+    workspace_.rebuildFromWindows(windowStateTracker_.current());
 
     return true;
 }
@@ -111,13 +113,14 @@ void DeskfieldApp::updateMode() {
 }
 
 void DeskfieldApp::syncWindows() {
-    const auto currentWindows = enumerator_.enumerate();
+    auto snapshots = enumerator_.enumerate();
+    windowStateTracker_.update(std::move(snapshots));
 
-    workspace_.updateNativeState(currentWindows);
+    workspace_.updateNativeState(windowStateTracker_.current());
 
     if (++syncCounter_ >= 15) {
         syncCounter_ = 0;
-        workspace_.syncFromWindows(currentWindows, camera_);
+        workspace_.syncFromWindows(windowStateTracker_.current(), camera_);
     }
 }
 

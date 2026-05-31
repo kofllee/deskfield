@@ -6,6 +6,7 @@
 
 #include "windowing/WindowController.h"
 #include "windowing/WindowEnumerator.h"
+#include "windowing/WindowStateTracker.h"
 
 #include "workspace/CanvasCameraController.h"
 #include "workspace/CanvasTypes.h"
@@ -35,6 +36,7 @@ private:
 
 private:
     WindowEnumerator enumerator_{};
+    WindowStateTracker windowStateTracker_{};
     WindowController controller_{};
     WorkspaceModel workspace_{};
     ViewportMapper mapper_{};
