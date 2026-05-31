@@ -19,8 +19,8 @@ add_executable(Deskfield
         src/workspace/ViewportMapper.cpp
         src/workspace/ViewportMapper.h
 
-        src/features/LayoutApplier.cpp
-        src/features/LayoutApplier.h
+        src/features/NativeLayoutSynchronizer.cpp
+        src/features/NativeLayoutSynchronizer.h
 
         src/overlay/OverlayWindow.cpp
         src/overlay/OverlayWindow.h

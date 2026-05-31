@@ -57,7 +57,7 @@ void DeskfieldApp::tick(double deltaSeconds) {
     const RECT workArea = getPrimaryWorkArea();
 
     if (mode_ == DeskfieldMode::Interactive) {
-        layoutApplier_.apply(
+        nativeLayoutSynchronizer_.synchronize(
             workspace_,
             camera_,
             workArea,

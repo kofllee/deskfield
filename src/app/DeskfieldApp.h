@@ -1,6 +1,6 @@
 #pragma once
 
-#include "features/LayoutApplier.h"
+#include "features/NativeLayoutSynchronizer.h"
 
 #include "overlay/OverlayWindow.h"
 
@@ -38,7 +38,7 @@ private:
     WindowController controller_{};
     WorkspaceModel workspace_{};
     ViewportMapper mapper_{};
-    LayoutApplier layoutApplier_{};
+    NativeLayoutSynchronizer nativeLayoutSynchronizer_{};
     OverlayWindow overlay_{};
     CanvasCameraController cameraController_{};
 
