@@ -21,13 +21,15 @@ bool DeskfieldApp::initialize() {
 
     cameraController_.resetTargets(camera_);
 
-    auto windows = enumerator_.enumerate();
-    windowStateTracker_.update(std::move(windows));
+    auto snapshots = enumerator_.enumerate();
+    windowStateTracker_.update(std::move(snapshots));
 
-    workspace_.rebuildFromWindows(
-        windowStateTracker_.current(),
-        windowRegistry_
-    );
+    workspace_.clear();
+
+    for (const WindowSnapshot& snapshot : windowStateTracker_.current()) {
+        const WindowId id = windowRegistry_.getOrCreate(snapshot.hwnd);
+        workspace_.addWindow(snapshot, id, camera_);
+    }
 
     return true;
 }
@@ -119,16 +121,7 @@ void DeskfieldApp::syncWindows() {
     auto snapshots = enumerator_.enumerate();
     windowStateTracker_.update(std::move(snapshots));
 
-    workspace_.updateNativeState(windowStateTracker_.current());
-
-    if (++syncCounter_ >= 15) {
-        syncCounter_ = 0;
-        workspace_.syncFromWindows(
-            windowStateTracker_.current(),
-            camera_,
-            windowRegistry_
-        );
-    }
+    applyWindowStateChanges();
 }
 
 void DeskfieldApp::renderOverlay() {
@@ -157,4 +150,42 @@ RECT DeskfieldApp::getPrimaryWorkArea() {
     RECT workArea{};
     SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
     return workArea;
+}
+
+void DeskfieldApp::applyWindowStateChanges() {
+    for (const WindowSnapshot& snapshot : windowStateTracker_.removedWindows()) {
+        const WindowId id = windowRegistry_.findByHwnd(snapshot.hwnd);
+
+        if (!id.isValid()) {
+            continue;
+        }
+
+        workspace_.removeWindow(id);
+        windowRegistry_.remove(snapshot.hwnd);
+    }
+
+    for (const WindowSnapshot& snapshot : windowStateTracker_.addedWindows()) {
+        const WindowId id = windowRegistry_.getOrCreate(snapshot.hwnd);
+        workspace_.addWindow(snapshot, id, camera_);
+    }
+
+    for (const WindowSnapshot& snapshot : windowStateTracker_.updatedWindows()) {
+        const WindowId id = windowRegistry_.findByHwnd(snapshot.hwnd);
+
+        if (!id.isValid()) {
+            continue;
+        }
+
+        workspace_.updateNativeState(id, snapshot);
+    }
+
+    for (const WindowSnapshot& snapshot : windowStateTracker_.current()) {
+        const WindowId id = windowRegistry_.findByHwnd(snapshot.hwnd);
+
+        if (!id.isValid()) {
+            continue;
+        }
+
+        workspace_.updateMetadata(id, snapshot);
+    }
 }

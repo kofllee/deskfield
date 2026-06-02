@@ -10,20 +10,12 @@ namespace {
 }
 
 
-bool NativeLayoutSynchronizer::shouldSynchronizeWindow(const ManagedWindow& window) const {
-    if (window.hwnd == nullptr || !IsWindow(window.hwnd)) {
+bool NativeLayoutSynchronizer::shouldSynchronizeWindow(const CanvasWindow& window) const {
+    if (window.hwnd == nullptr) {
         return false;
     }
 
-    if (IsIconic(window.hwnd)) {
-        return false;
-    }
-
-    if (IsZoomed(window.hwnd)) {
-        return false;
-    }
-
-    if (window.state != ManagedWindowState::Normal) {
+    if (window.state != DeskfieldWindowState::Normal) {
         return false;
     }
 
@@ -41,7 +33,7 @@ void NativeLayoutSynchronizer::synchronize(
     const ViewportMapper& mapper,
     const WindowController& controller
 ) {
-    for (const ManagedWindow& window : workspace.windows()) {
+    for (const CanvasWindow& window : workspace.windows()) {
         if (!shouldSynchronizeWindow(window)) {
             continue;
         }

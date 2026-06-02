@@ -9,14 +9,16 @@
 #include <windows.h>
 #include <vector>
 
-enum class ManagedWindowState {
+enum class DeskfieldWindowState {
     Normal,
-    Minimized,
-    Maximized,
-    Hidden
+    Hidden,
+    CanvasFullscreen,
+    NativeMinimized,
+    NativeMaximized,
+    Closed
 };
 
-struct ManagedWindow {
+struct CanvasWindow {
     WindowId id{};
     HWND hwnd{};
 
@@ -25,48 +27,58 @@ struct ManagedWindow {
     DWORD processId{};
 
     CanvasRect canvasRect{};
-    CanvasRect savedNormalRect{};
+    CanvasRect savedNormalCanvasRect{};
 
-    ManagedWindowState state{ManagedWindowState::Normal};
+    DeskfieldWindowState state{DeskfieldWindowState::Normal};
 
-    bool wasMinimized{};
-    bool wasMaximized{};
+    bool selected{};
+    bool captureEnabled{true};
 };
 
 class WorkspaceModel {
 public:
-    void rebuildFromWindows(
-        const std::vector<WindowSnapshot>& windows,
-        WindowRegistry& registry
-    );
+    void clear();
 
-    void syncFromWindows(
-        const std::vector<WindowSnapshot>& windows,
-        const CanvasCamera& camera,
-        WindowRegistry& registry
-    );
-
-    void updateNativeState(const std::vector<WindowSnapshot>& windows);
-
-    std::vector<ManagedWindow>& windows();
-    const std::vector<ManagedWindow>& windows() const;
-
-private:
-    std::vector<ManagedWindow> windows_;
-
-    ManagedWindow* findByHwnd(HWND hwnd);
-    const ManagedWindow* findByHwnd(HWND hwnd) const;
-
-    static bool containsWindow(const std::vector<WindowSnapshot>& windows, HWND hwnd);
-
-    static CanvasRect makeInitialCanvasRect(
-        const WindowSnapshot& window,
+    void addWindow(
+        const WindowSnapshot& snapshot,
+        WindowId id,
         const CanvasCamera& camera
     );
 
-    static ManagedWindow makeManagedWindow(
-        const WindowSnapshot& window,
-        const CanvasCamera& camera,
-        WindowId id
+    void removeWindow(WindowId id);
+
+    void updateMetadata(
+        WindowId id,
+        const WindowSnapshot& snapshot
     );
+
+    void updateNativeState(
+        WindowId id,
+        const WindowSnapshot& snapshot
+    );
+
+    void setCanvasRect(WindowId id, const CanvasRect& rect);
+    void setState(WindowId id, DeskfieldWindowState state);
+
+    CanvasWindow* findById(WindowId id);
+    const CanvasWindow* findById(WindowId id) const;
+
+    CanvasWindow* findByHwnd(HWND hwnd);
+    const CanvasWindow* findByHwnd(HWND hwnd) const;
+
+    std::vector<CanvasWindow>& windows();
+    const std::vector<CanvasWindow>& windows() const;
+
+private:
+    static CanvasRect makeInitialCanvasRect(
+        const WindowSnapshot& snapshot,
+        const CanvasCamera& camera
+    );
+
+    static DeskfieldWindowState stateFromSnapshot(
+        const WindowSnapshot& snapshot
+    );
+
+private:
+    std::vector<CanvasWindow> windows_{};
 };

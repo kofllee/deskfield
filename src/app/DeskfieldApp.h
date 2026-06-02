@@ -35,6 +35,8 @@ private:
 
     static RECT getPrimaryWorkArea();
 
+    void applyWindowStateChanges();
+
 private:
     WindowEnumerator enumerator_{};
     WindowStateTracker windowStateTracker_{};
