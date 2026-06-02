@@ -13,12 +13,13 @@
 #include "workspace/ViewportMapper.h"
 #include "workspace/WorkspaceModel.h"
 #include "workspace/WindowRegistry.h"
+#include "DeskfieldMode.h"
+#include "rendering/GdiDebugCanvasRenderer.h"
 
 #include <windows.h>
 
 #include <chrono>
 
-#include "DeskfieldMode.h"
 
 class DeskfieldApp {
 public:
@@ -47,7 +48,10 @@ private:
     ViewportMapper mapper_{};
 
     NativeLayoutSynchronizer nativeLayoutSynchronizer_{};
+
+    GdiDebugCanvasRenderer debugCanvasRenderer_{};
     OverlayWindow overlay_{};
+
     CanvasCameraController cameraController_{};
 
     CanvasCamera camera_{};

@@ -13,6 +13,7 @@ bool DeskfieldApp::initialize() {
         return false;
     }
 
+    overlay_.setRenderer(&debugCanvasRenderer_);
     overlay_.show();
 
     camera_.x = 0.0;
@@ -124,34 +125,6 @@ void DeskfieldApp::syncWindows() {
     applyWindowStateChanges();
 }
 
-void DeskfieldApp::renderOverlay() {
-    const RECT workArea = getPrimaryWorkArea();
-
-    overlay_.setSnapshot(&workspace_, camera_, workArea);
-    overlay_.repaint();
-}
-
-void DeskfieldApp::processMessages(bool& shouldQuit) {
-    MSG msg{};
-
-    while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
-        if (msg.message == WM_QUIT) {
-            shouldQuit = true;
-            return;
-        }
-
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
-    }
-}
-
-
-RECT DeskfieldApp::getPrimaryWorkArea() {
-    RECT workArea{};
-    SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
-    return workArea;
-}
-
 void DeskfieldApp::applyWindowStateChanges() {
     for (const WindowSnapshot& snapshot : windowStateTracker_.removedWindows()) {
         const WindowId id = windowRegistry_.findByHwnd(snapshot.hwnd);
@@ -188,4 +161,36 @@ void DeskfieldApp::applyWindowStateChanges() {
 
         workspace_.updateMetadata(id, snapshot);
     }
+}
+
+void DeskfieldApp::renderOverlay() {
+    const RECT workArea = getPrimaryWorkArea();
+
+    overlay_.setSnapshot(
+        &workspace_,
+        camera_,
+        workArea
+    );
+
+    overlay_.repaint();
+}
+
+void DeskfieldApp::processMessages(bool& shouldQuit) {
+    MSG msg{};
+
+    while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
+        if (msg.message == WM_QUIT) {
+            shouldQuit = true;
+            return;
+        }
+
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+}
+
+RECT DeskfieldApp::getPrimaryWorkArea() {
+    RECT workArea{};
+    SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
+    return workArea;
 }

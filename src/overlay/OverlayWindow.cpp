@@ -1,7 +1,5 @@
 #include "OverlayWindow.h"
 
-#include <string>
-
 namespace {
     constexpr wchar_t OverlayClassName[] = L"DeskfieldOverlayWindow";
 
@@ -11,23 +9,6 @@ namespace {
 
     int rectHeight(const RECT& rect) {
         return rect.bottom - rect.top;
-    }
-
-    RECT canvasToScreen(const CanvasRect& rect, const CanvasCamera& camera, const RECT& workArea) {
-        const double zoom = camera.zoom;
-
-        RECT out{};
-        out.left = static_cast<LONG>(workArea.left + (rect.x - camera.x) * zoom);
-        out.top = static_cast<LONG>(workArea.top + (rect.y - camera.y) * zoom);
-        out.right = static_cast<LONG>(out.left + rect.width * zoom);
-        out.bottom = static_cast<LONG>(out.top + rect.height * zoom);
-
-        return out;
-    }
-
-    bool intersects(const RECT& a, const RECT& b) {
-        RECT tmp{};
-        return IntersectRect(&tmp, &a, &b) != FALSE;
     }
 }
 
@@ -55,7 +36,11 @@ bool OverlayWindow::create(const RECT& workArea) {
     RegisterClassExW(&wc);
 
     hwnd_ = CreateWindowExW(
-        WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+        WS_EX_LAYERED |
+        WS_EX_TRANSPARENT |
+        WS_EX_NOACTIVATE |
+        WS_EX_TOOLWINDOW |
+        WS_EX_TOPMOST,
         OverlayClassName,
         L"Deskfield Overlay",
         WS_POPUP,
@@ -97,7 +82,15 @@ void OverlayWindow::hide() {
     }
 }
 
-void OverlayWindow::setSnapshot(const WorkspaceModel *workspace, CanvasCamera camera, RECT workArea) {
+void OverlayWindow::setRenderer(ICanvasRenderer* renderer) {
+    renderer_ = renderer;
+}
+
+void OverlayWindow::setSnapshot(
+    const WorkspaceModel* workspace,
+    CanvasCamera camera,
+    RECT workArea
+) {
     workspace_ = workspace;
     camera_ = camera;
     workArea_ = workArea;
@@ -121,7 +114,12 @@ void OverlayWindow::repaint() {
     }
 }
 
-LRESULT OverlayWindow::windowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+LRESULT OverlayWindow::windowProc(
+    HWND hwnd,
+    UINT msg,
+    WPARAM wParam,
+    LPARAM lParam
+) {
     OverlayWindow* self = nullptr;
 
     if (msg == WM_NCCREATE) {
@@ -190,6 +188,7 @@ void OverlayWindow::paint() {
     GetClientRect(hwnd_, &clientRect);
 
     HDC memoryDc = CreateCompatibleDC(hdc);
+
     HBITMAP bitmap = CreateCompatibleBitmap(
         hdc,
         rectWidth(clientRect),
@@ -198,12 +197,19 @@ void OverlayWindow::paint() {
 
     HGDIOBJ oldBitmap = SelectObject(memoryDc, bitmap);
 
-    HBRUSH background = CreateSolidBrush(RGB(8, 10, 14));
-    FillRect(memoryDc, &clientRect, background);
-    DeleteObject(background);
-
-    drawGrid(memoryDc, clientRect);
-    drawWindow(memoryDc);
+    if (renderer_ != nullptr && workspace_ != nullptr) {
+        renderer_->render(
+            memoryDc,
+            clientRect,
+            *workspace_,
+            camera_,
+            workArea_
+        );
+    } else {
+        HBRUSH background = CreateSolidBrush(RGB(8, 10, 14));
+        FillRect(memoryDc, &clientRect, background);
+        DeleteObject(background);
+    }
 
     BitBlt(
         hdc,
@@ -222,116 +228,4 @@ void OverlayWindow::paint() {
     DeleteDC(memoryDc);
 
     EndPaint(hwnd_, &ps);
-}
-
-void OverlayWindow::drawGrid(HDC hdc, const RECT& clientRect) {
-    const int baseStep = 120;
-    const int step = static_cast<int>(baseStep * camera_.zoom);
-
-    if (step < 24) {
-        return;
-    }
-
-    HPEN gridPen = CreatePen(PS_SOLID, 1, RGB(45, 50, 60));
-    HGDIOBJ oldPen = SelectObject(hdc, gridPen);
-
-    const int offsetX = static_cast<int>(-camera_.x * camera_.zoom) % step;
-    const int offsetY = static_cast<int>(-camera_.y * camera_.zoom) % step;
-
-    for (int x = offsetX; x < rectWidth(clientRect); x += step) {
-        MoveToEx(hdc, x, 0, nullptr);
-        LineTo(hdc, x, rectHeight(clientRect));
-    }
-
-    for (int y = offsetY; y < rectHeight(clientRect); y += step) {
-        MoveToEx(hdc, 0, y, nullptr);
-        LineTo(hdc, rectWidth(clientRect), y);
-    }
-
-    SelectObject(hdc, oldPen);
-    DeleteObject(gridPen);
-}
-
-void OverlayWindow::drawWindow(HDC hdc) {
-    if (workspace_ == nullptr) {
-        return;
-    }
-
-    RECT visibleArea{};
-    GetClientRect(hwnd_, &visibleArea);
-
-    HPEN borderPen = CreatePen(PS_SOLID, 2, RGB(120, 170, 255));
-    HBRUSH cardBrush = CreateSolidBrush(RGB(24, 30, 42));
-    HBRUSH titleBrush = CreateSolidBrush(RGB(18, 24, 34));
-
-    HGDIOBJ oldPen = SelectObject(hdc, borderPen);
-    HGDIOBJ oldBrush = SelectObject(hdc, cardBrush);
-
-    SetBkMode(hdc, TRANSPARENT);
-    SetTextColor(hdc, RGB(220, 230, 245));
-
-    for (const auto& window: workspace_->windows()) {
-        const RECT screenRect = canvasToScreen(window.canvasRect, camera_, workArea_);
-
-        RECT localRect = screenRect;
-        OffsetRect(&localRect, -workArea_.left, -workArea_.top);
-
-        if (!intersects(localRect, visibleArea)) {
-            continue;
-        }
-
-        Rectangle(
-            hdc,
-            localRect.left,
-            localRect.top,
-            localRect.right,
-            localRect.bottom
-        );
-
-        constexpr int titleHeight = 24;
-        constexpr int titlePaddingX = 8;
-        constexpr int titleGap = 4;
-
-        RECT titleBackground{};
-        titleBackground.left = localRect.left;
-        titleBackground.right = localRect.right;
-        titleBackground.bottom = localRect.top - titleGap;
-        titleBackground.top = titleBackground.bottom - titleHeight;
-
-        if (titleBackground.top < 0) {
-            titleBackground.top = localRect.top + titleGap;
-            titleBackground.bottom = titleBackground.top + titleHeight;
-        }
-
-        HGDIOBJ oldTitleBrush = SelectObject(hdc, titleBrush);
-        Rectangle(
-            hdc,
-            titleBackground.left,
-            titleBackground.top,
-            titleBackground.right,
-            titleBackground.bottom
-        );
-        SelectObject(hdc, oldTitleBrush);
-
-        RECT titleTextRect = titleBackground;
-        titleTextRect.left += titlePaddingX;
-        titleTextRect.right -= titlePaddingX;
-        titleTextRect.top += 4;
-
-        DrawTextW(
-            hdc,
-            window.title.c_str(),
-            static_cast<int>(window.title.size()),
-            &titleTextRect,
-            DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX
-        );
-
-    }
-
-    SelectObject(hdc, oldBrush);
-    SelectObject(hdc, oldPen);
-
-    DeleteObject(titleBrush);
-    DeleteObject(cardBrush);
-    DeleteObject(borderPen);
 }
