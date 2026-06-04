@@ -37,6 +37,12 @@ add_executable(Deskfield
         src/rendering/ICanvasRenderer.h
         src/rendering/GdiDebugCanvasRenderer.cpp
         src/rendering/GdiDebugCanvasRenderer.h
+        src/windowing/SourceWindowHost.cpp
+        src/windowing/SourceWindowHost.h
+        src/capture/CapturedWindow.cpp
+        src/capture/CapturedWindow.h
+        src/capture/GraphicsCaptureManager.cpp
+        src/capture/GraphicsCaptureManager.h
 )
 
 target_include_directories(Deskfield PRIVATE

@@ -26,11 +26,7 @@ bool DeskfieldApp::initialize() {
     windowStateTracker_.update(std::move(snapshots));
 
     workspace_.clear();
-
-    for (const WindowSnapshot& snapshot : windowStateTracker_.current()) {
-        const WindowId id = windowRegistry_.getOrCreate(snapshot.hwnd);
-        workspace_.addWindow(snapshot, id, camera_);
-    }
+    registerInitialWindows();
 
     return true;
 }
@@ -62,6 +58,8 @@ void DeskfieldApp::tick(double deltaSeconds) {
     updateMode();
     syncWindows();
 
+    graphicsCaptureManager_.update();
+
     const RECT workArea = getPrimaryWorkArea();
 
     if (mode_ == DeskfieldMode::Interactive) {
@@ -70,7 +68,8 @@ void DeskfieldApp::tick(double deltaSeconds) {
             camera_,
             workArea,
             mapper_,
-            controller_
+            controller_,
+            sourceWindowHost_
         );
     }
 
@@ -133,13 +132,16 @@ void DeskfieldApp::applyWindowStateChanges() {
             continue;
         }
 
+        graphicsCaptureManager_.detach(id);
         workspace_.removeWindow(id);
         windowRegistry_.remove(snapshot.hwnd);
     }
 
     for (const WindowSnapshot& snapshot : windowStateTracker_.addedWindows()) {
         const WindowId id = windowRegistry_.getOrCreate(snapshot.hwnd);
+
         workspace_.addWindow(snapshot, id, camera_);
+        graphicsCaptureManager_.attach(id, snapshot.hwnd);
     }
 
     for (const WindowSnapshot& snapshot : windowStateTracker_.updatedWindows()) {
@@ -173,6 +175,15 @@ void DeskfieldApp::renderOverlay() {
     );
 
     overlay_.repaint();
+}
+
+void DeskfieldApp::registerInitialWindows() {
+    for (const WindowSnapshot& snapshot : windowStateTracker_.current()) {
+        const WindowId id = windowRegistry_.getOrCreate(snapshot.hwnd);
+
+        workspace_.addWindow(snapshot, id, camera_);
+        graphicsCaptureManager_.attach(id, snapshot.hwnd);
+    }
 }
 
 void DeskfieldApp::processMessages(bool& shouldQuit) {

@@ -13,8 +13,12 @@
 #include "workspace/ViewportMapper.h"
 #include "workspace/WorkspaceModel.h"
 #include "workspace/WindowRegistry.h"
-#include "DeskfieldMode.h"
+
 #include "rendering/GdiDebugCanvasRenderer.h"
+
+#include "capture/GraphicsCaptureManager.h"
+
+#include "DeskfieldMode.h"
 
 #include <windows.h>
 
@@ -32,21 +36,25 @@ private:
     void processMessages(bool& shouldQuit);
     void updateMode();
     void syncWindows();
+    void applyWindowStateChanges();
     void renderOverlay();
 
-    static RECT getPrimaryWorkArea();
+    void registerInitialWindows();
 
-    void applyWindowStateChanges();
+    static RECT getPrimaryWorkArea();
 
 private:
     WindowEnumerator enumerator_{};
     WindowStateTracker windowStateTracker_{};
+
     WindowController controller_{};
+    SourceWindowHost sourceWindowHost_{};
 
     WorkspaceModel workspace_{};
     WindowRegistry windowRegistry_{};
     ViewportMapper mapper_{};
 
+    GraphicsCaptureManager graphicsCaptureManager_{};
     NativeLayoutSynchronizer nativeLayoutSynchronizer_{};
 
     GdiDebugCanvasRenderer debugCanvasRenderer_{};
