@@ -5,15 +5,17 @@
 #include "workspace/CanvasTypes.h"
 #include "workspace/WorkspaceModel.h"
 
+#include <functional>
+
 #include <windows.h>
 
-class OverlayWindow {
+class CanvasHostWindow {
 public:
-    OverlayWindow() = default;
-    ~OverlayWindow();
+    CanvasHostWindow() = default;
+    ~CanvasHostWindow();
 
-    OverlayWindow(const OverlayWindow&) = delete;
-    OverlayWindow& operator=(const OverlayWindow&) = delete;
+    CanvasHostWindow(const CanvasHostWindow&) = delete;
+    CanvasHostWindow& operator=(const CanvasHostWindow&) = delete;
 
     bool create(const RECT& workArea);
     void destroy();
@@ -22,6 +24,7 @@ public:
     void hide();
 
     void setRenderer(ICanvasRenderer* renderer);
+    void setResizeCallback(std::function<void(const RECT&)> callback);
 
     void setSnapshot(
         const WorkspaceModel* workspace,
@@ -51,6 +54,7 @@ private:
     HWND hwnd_{nullptr};
 
     ICanvasRenderer* renderer_{nullptr};
+    std::function<void(const RECT&)> resizeCallback_{};
 
     const WorkspaceModel* workspace_{nullptr};
     CanvasCamera camera_{};

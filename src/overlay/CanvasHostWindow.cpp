@@ -1,4 +1,6 @@
-#include "OverlayWindow.h"
+#include "CanvasHostWindow.h"
+
+#include <utility>
 
 namespace {
     constexpr wchar_t OverlayClassName[] = L"DeskfieldOverlayWindow";
@@ -12,11 +14,11 @@ namespace {
     }
 }
 
-OverlayWindow::~OverlayWindow() {
+CanvasHostWindow::~CanvasHostWindow() {
     destroy();
 }
 
-bool OverlayWindow::create(const RECT& workArea) {
+bool CanvasHostWindow::create(const RECT& workArea) {
     if (hwnd_ != nullptr) {
         return false;
     }
@@ -28,7 +30,7 @@ bool OverlayWindow::create(const RECT& workArea) {
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.hInstance = instance;
-    wc.lpfnWndProc = OverlayWindow::windowProc;
+    wc.lpfnWndProc = CanvasHostWindow::windowProc;
     wc.lpszClassName = OverlayClassName;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     wc.hbrBackground = nullptr;
@@ -36,13 +38,9 @@ bool OverlayWindow::create(const RECT& workArea) {
     RegisterClassExW(&wc);
 
     hwnd_ = CreateWindowExW(
-        WS_EX_LAYERED |
-        WS_EX_TRANSPARENT |
-        WS_EX_NOACTIVATE |
-        WS_EX_TOOLWINDOW |
-        WS_EX_TOPMOST,
+        WS_EX_APPWINDOW,
         OverlayClassName,
-        L"Deskfield Overlay",
+        L"Deskfield",
         WS_POPUP,
         workArea.left,
         workArea.top,
@@ -58,35 +56,38 @@ bool OverlayWindow::create(const RECT& workArea) {
         return false;
     }
 
-    SetLayeredWindowAttributes(hwnd_, 0, 90, LWA_ALPHA);
-
     return true;
 }
 
-void OverlayWindow::destroy() {
+void CanvasHostWindow::destroy() {
     if (hwnd_ != nullptr) {
         DestroyWindow(hwnd_);
         hwnd_ = nullptr;
     }
 }
 
-void OverlayWindow::show() {
+void CanvasHostWindow::show() {
     if (hwnd_ != nullptr) {
-        ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
+        ShowWindow(hwnd_, SW_SHOW);
+        UpdateWindow(hwnd_);
     }
 }
 
-void OverlayWindow::hide() {
+void CanvasHostWindow::hide() {
     if (hwnd_ != nullptr) {
         ShowWindow(hwnd_, SW_HIDE);
     }
 }
 
-void OverlayWindow::setRenderer(ICanvasRenderer* renderer) {
+void CanvasHostWindow::setRenderer(ICanvasRenderer* renderer) {
     renderer_ = renderer;
 }
 
-void OverlayWindow::setSnapshot(
+void CanvasHostWindow::setResizeCallback(std::function<void(const RECT&)> callback) {
+    resizeCallback_ = std::move(callback);
+}
+
+void CanvasHostWindow::setSnapshot(
     const WorkspaceModel* workspace,
     CanvasCamera camera,
     RECT workArea
@@ -108,23 +109,23 @@ void OverlayWindow::setSnapshot(
     }
 }
 
-void OverlayWindow::repaint() {
+void CanvasHostWindow::repaint() {
     if (hwnd_ != nullptr) {
         InvalidateRect(hwnd_, nullptr, FALSE);
     }
 }
 
-LRESULT OverlayWindow::windowProc(
+LRESULT CanvasHostWindow::windowProc(
     HWND hwnd,
     UINT msg,
     WPARAM wParam,
     LPARAM lParam
 ) {
-    OverlayWindow* self = nullptr;
+    CanvasHostWindow* self = nullptr;
 
     if (msg == WM_NCCREATE) {
         auto* createStruct = reinterpret_cast<CREATESTRUCTW*>(lParam);
-        self = static_cast<OverlayWindow*>(createStruct->lpCreateParams);
+        self = static_cast<CanvasHostWindow*>(createStruct->lpCreateParams);
 
         if (self == nullptr) {
             return FALSE;
@@ -141,7 +142,7 @@ LRESULT OverlayWindow::windowProc(
         return TRUE;
     }
 
-    self = reinterpret_cast<OverlayWindow*>(
+    self = reinterpret_cast<CanvasHostWindow*>(
         GetWindowLongPtrW(hwnd, GWLP_USERDATA)
     );
 
@@ -159,7 +160,7 @@ LRESULT OverlayWindow::windowProc(
     return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
-LRESULT OverlayWindow::handleMessage(
+LRESULT CanvasHostWindow::handleMessage(
     UINT msg,
     WPARAM wParam,
     LPARAM lParam
@@ -175,12 +176,22 @@ LRESULT OverlayWindow::handleMessage(
         case WM_NCDESTROY:
             return DefWindowProcW(hwnd_, msg, wParam, lParam);
 
+        case WM_SIZE: {
+            if (resizeCallback_) {
+                RECT clientRect{};
+                GetClientRect(hwnd_, &clientRect);
+                resizeCallback_(clientRect);
+            }
+
+            return 0;
+        }
+
         default:
             return DefWindowProcW(hwnd_, msg, wParam, lParam);
     }
 }
 
-void OverlayWindow::paint() {
+void CanvasHostWindow::paint() {
     PAINTSTRUCT ps{};
     HDC hdc = BeginPaint(hwnd_, &ps);
 

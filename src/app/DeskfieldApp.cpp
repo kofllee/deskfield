@@ -11,9 +11,15 @@ bool DeskfieldApp::initialize() {
     const RECT workArea = getPrimaryWorkArea();
 
     if (!overlay_.create(workArea)) {
-        std::wcout << L"Failed to create overlay. Error: " << GetLastError() << L"\n";
+        std::wcout << L"Failed to create Deskfield surface. Error: " << GetLastError() << L"\n";
         return false;
     }
+
+    overlay_.setResizeCallback(
+        [this](const RECT& clientRect) {
+            d3dCanvasRenderer_.resize(clientRect);
+        }
+    );
 
     if (!d3dCanvasRenderer_.initialize(overlay_.hwnd())) {
         std::wcout << L"D3D renderer failed to initialize\n";
@@ -21,7 +27,6 @@ bool DeskfieldApp::initialize() {
         std::wcout << L"D3D renderer initialized\n";
     }
 
-    overlay_.setRenderer(&debugCanvasRenderer_);
     overlay_.show();
 
     camera_.x = 0.0;

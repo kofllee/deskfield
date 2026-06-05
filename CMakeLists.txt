@@ -22,8 +22,8 @@ add_executable(Deskfield
         src/features/NativeLayoutSynchronizer.cpp
         src/features/NativeLayoutSynchronizer.h
 
-        src/overlay/OverlayWindow.cpp
-        src/overlay/OverlayWindow.h
+        src/overlay/CanvasHostWindow.cpp
+        src/overlay/CanvasHostWindow.h
         src/app/DeskfieldMode.h
         src/workspace/CanvasCameraController.cpp
         src/workspace/CanvasCameraController.h
