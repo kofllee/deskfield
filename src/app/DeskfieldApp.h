@@ -15,6 +15,7 @@
 #include "workspace/WindowRegistry.h"
 
 #include "rendering/GdiDebugCanvasRenderer.h"
+#include "rendering/D3DCanvasRenderer.h"
 
 #include "capture/GraphicsCaptureManager.h"
 
@@ -59,6 +60,7 @@ private:
 
     GdiDebugCanvasRenderer debugCanvasRenderer_{};
     OverlayWindow overlay_{};
+    D3DCanvasRenderer d3dCanvasRenderer_{};
 
     CanvasCameraController cameraController_{};
 

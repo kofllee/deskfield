@@ -13,6 +13,12 @@ bool DeskfieldApp::initialize() {
         return false;
     }
 
+    if (!d3dCanvasRenderer_.initialize(overlay_.hwnd())) {
+        std::wcout << L"D3D renderer failed to initialize\n";
+    } else {
+        std::wcout << L"D3D renderer initialized\n";
+    }
+
     overlay_.setRenderer(&debugCanvasRenderer_);
     overlay_.show();
 
@@ -168,13 +174,21 @@ void DeskfieldApp::applyWindowStateChanges() {
 void DeskfieldApp::renderOverlay() {
     const RECT workArea = getPrimaryWorkArea();
 
-    overlay_.setSnapshot(
-        &workspace_,
-        camera_,
-        workArea
-    );
+    if (d3dCanvasRenderer_.isInitialized()) {
+        d3dCanvasRenderer_.render(
+            workspace_,
+            camera_,
+            workArea
+        );
+    }
 
-    overlay_.repaint();
+    // overlay_.setSnapshot(
+    //     &workspace_,
+    //     camera_,
+    //     workArea
+    // );
+    //
+    // overlay_.repaint();
 }
 
 void DeskfieldApp::registerInitialWindows() {

@@ -66,4 +66,6 @@ target_compile_definitions(Deskfield PRIVATE
 target_link_libraries(Deskfield PRIVATE
         user32
         dwmapi
+        d3d11
+        dxgi
 )
