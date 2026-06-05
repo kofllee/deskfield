@@ -43,6 +43,14 @@ add_executable(Deskfield
         src/capture/CapturedWindow.h
         src/capture/GraphicsCaptureManager.cpp
         src/capture/GraphicsCaptureManager.h
+        src/rendering/D3DDevice.cpp
+        src/rendering/D3DDevice.h
+        src/rendering/D3DCanvasRenderer.cpp
+        src/rendering/D3DCanvasRenderer.h
+        src/rendering/CanvasGridRenderer.cpp
+        src/rendering/CanvasGridRenderer.h
+        src/rendering/CapturedWindowRenderer.cpp
+        src/rendering/CapturedWindowRenderer.h
 )
 
 target_include_directories(Deskfield PRIVATE
