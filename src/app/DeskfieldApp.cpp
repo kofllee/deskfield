@@ -1,10 +1,12 @@
 #include "DeskfieldApp.h"
 
+#include "platform/Win32Dpi.h"
+
 #include <iostream>
 #include <thread>
 
 bool DeskfieldApp::initialize() {
-    SetProcessDPIAware();
+    enablePerMonitorDpiAwareness();
 
     const RECT workArea = getPrimaryWorkArea();
 
@@ -140,6 +142,7 @@ void DeskfieldApp::applyWindowStateChanges() {
 
         graphicsCaptureManager_.detach(id);
         workspace_.removeWindow(id);
+        sourceWindowHost_.forget(snapshot.hwnd);
         windowRegistry_.remove(snapshot.hwnd);
     }
 

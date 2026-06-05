@@ -46,11 +46,24 @@ bool SourceWindowHost::applyNativeLayout(
     return true;
 }
 
+void SourceWindowHost::forget(HWND hwnd) {
+    lastAppliedRects_.erase(hwnd);
+}
+
+void SourceWindowHost::clear() {
+    lastAppliedRects_.clear();
+}
+
 bool SourceWindowHost::shouldSkipUnchangedRect(HWND hwnd, const RECT& rect) const {
-    return hwnd == lastHwnd_ && sameRect(rect, lastRect_);
+    const auto it = lastAppliedRects_.find(hwnd);
+
+    if (it == lastAppliedRects_.end()) {
+        return false;
+    }
+
+    return sameRect(it->second, rect);
 }
 
 void SourceWindowHost::rememberAppliedRect(HWND hwnd, const RECT& rect) {
-    lastHwnd_ = hwnd;
-    lastRect_ = rect;
+    lastAppliedRects_[hwnd] = rect;
 }

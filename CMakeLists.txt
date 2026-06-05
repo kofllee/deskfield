@@ -51,6 +51,8 @@ add_executable(Deskfield
         src/rendering/CanvasGridRenderer.h
         src/rendering/CapturedWindowRenderer.cpp
         src/rendering/CapturedWindowRenderer.h
+        src/platform/Win32Dpi.cpp
+        src/platform/Win32Dpi.h
 )
 
 target_include_directories(Deskfield PRIVATE

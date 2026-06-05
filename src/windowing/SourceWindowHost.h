@@ -20,12 +20,14 @@ public:
         const WindowController& controller
     );
 
+    void forget(HWND hwnd);
+    void clear();
+
 private:
     bool shouldSkipUnchangedRect(HWND hwnd, const RECT& rect) const;
     void rememberAppliedRect(HWND hwnd, const RECT& rect);
 
 private:
-    HWND lastHwnd_{nullptr};
-    RECT lastRect_{};
+    std::unordered_map<HWND, RECT> lastAppliedRects_{};
 };
 
