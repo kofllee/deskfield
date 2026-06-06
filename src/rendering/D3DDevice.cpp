@@ -1,26 +1,25 @@
 #include "D3DDevice.h"
 
+#include <dxgi.h>
 #include <iterator>
 
 bool D3DDevice::initialize() {
-    if (isValid()) {
-        return true;
-    }
-
-    constexpr D3D_FEATURE_LEVEL featureLevels[] = {
-        D3D_FEATURE_LEVEL_11_1,
-        D3D_FEATURE_LEVEL_11_0
-    };
-
-    D3D_FEATURE_LEVEL selectedFeatureLevel{};
-
     UINT flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
 
 #if defined(_DEBUG)
     flags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-    HRESULT result = D3D11CreateDevice(
+    D3D_FEATURE_LEVEL featureLevels[] = {
+        D3D_FEATURE_LEVEL_11_1,
+        D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_10_1,
+        D3D_FEATURE_LEVEL_10_0
+    };
+
+    D3D_FEATURE_LEVEL createdFeatureLevel{};
+
+    HRESULT hr = D3D11CreateDevice(
         nullptr,
         D3D_DRIVER_TYPE_HARDWARE,
         nullptr,
@@ -28,35 +27,33 @@ bool D3DDevice::initialize() {
         featureLevels,
         static_cast<UINT>(std::size(featureLevels)),
         D3D11_SDK_VERSION,
-        device_.GetAddressOf(),
-        &selectedFeatureLevel,
-        context_.GetAddressOf()
+        &device_,
+        &createdFeatureLevel,
+        &context_
     );
 
-#if defined(_DEBUG)
-    if (FAILED(result)) {
-        flags &= ~D3D11_CREATE_DEVICE_DEBUG;
-
-        result = D3D11CreateDevice(
+    if (FAILED(hr)) {
+        hr = D3D11CreateDevice(
             nullptr,
             D3D_DRIVER_TYPE_HARDWARE,
             nullptr,
-            flags,
+            D3D11_CREATE_DEVICE_BGRA_SUPPORT,
             featureLevels,
             static_cast<UINT>(std::size(featureLevels)),
             D3D11_SDK_VERSION,
-            device_.GetAddressOf(),
-            &selectedFeatureLevel,
-            context_.GetAddressOf()
+            &device_,
+            &createdFeatureLevel,
+            &context_
         );
     }
-#endif
 
-    if (FAILED(result)) {
+    if (FAILED(hr)) {
         return false;
     }
 
-    result = device_.As(&dxgiDevice_);
+    device_.As(&device1_);
+    context_.As(&context1_);
+    device_.As(&dxgiDevice_);
 
-    return SUCCEEDED(result);
+    return dxgiDevice_ != nullptr;
 }

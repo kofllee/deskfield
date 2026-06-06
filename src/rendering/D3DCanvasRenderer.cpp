@@ -1,5 +1,9 @@
 #include "D3DCanvasRenderer.h"
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+
 namespace {
     constexpr float BackgroundColor[] = {
         0.031f,
@@ -90,9 +94,10 @@ void D3DCanvasRenderer::resize(const RECT& clientRect) {
 }
 
 void D3DCanvasRenderer::render(
-    const WorkspaceModel&,
-    const CanvasCamera&,
-    const RECT&
+    const WorkspaceModel& workspace,
+    const CanvasCamera& camera,
+    const RECT& workArea,
+    const ViewportMapper& mapper
 ) {
     if (!initialized_ || !device_.isValid() || renderTargetView_ == nullptr) {
         return;
@@ -121,7 +126,59 @@ void D3DCanvasRenderer::render(
         BackgroundColor
     );
 
+    drawCanvasGrid();
+
+    const auto items = buildVisualWindowDrawItems(
+        workspace,
+        camera,
+        workArea,
+        mapper
+    );
+
+    drawVisualWindows(items);
+
     swapChain_->Present(1, 0);
+}
+
+std::vector<VisualWindowDrawItem> D3DCanvasRenderer::buildVisualWindowDrawItems(
+    const WorkspaceModel& workspace,
+    const CanvasCamera& camera,
+    const RECT& workArea,
+    const ViewportMapper& mapper
+) const {
+    std::vector<VisualWindowDrawItem> items;
+
+    for (const CanvasWindow& window : workspace.windows()) {
+        if (window.state == DeskfieldWindowState::Closed ||
+            window.state == DeskfieldWindowState::Hidden) {
+            continue;
+            }
+
+        RECT visualRect = mapper.mapCanvasToVisualRect(
+            window.canvasRect,
+            camera,
+            workArea
+        );
+
+        if (visualRect.right <= 0 ||
+            visualRect.bottom <= 0 ||
+            visualRect.left >= rectWidth(clientRect_) ||
+            visualRect.top >= rectHeight(clientRect_)) {
+            continue;
+            }
+
+        VisualWindowDrawItem item{};
+        item.id = window.id;
+        item.visualRect = visualRect;
+        item.title = window.title;
+        item.selected = window.selected;
+        item.focused = false;
+        item.captureAvailable = window.captureEnabled;
+
+        items.push_back(std::move(item));
+    }
+
+    return items;
 }
 
 bool D3DCanvasRenderer::createSwapChain() {
@@ -231,4 +288,94 @@ int D3DCanvasRenderer::rectHeight(const RECT& rect) {
     return rect.bottom - rect.top;
 }
 
+void D3DCanvasRenderer::drawCanvasGrid() {
+    constexpr float minorGridColor[] = {0.075f, 0.085f, 0.11f, 1.0f};
+    constexpr int gridStep = 64;
+
+    const int width = rectWidth(clientRect_);
+    const int height = rectHeight(clientRect_);
+
+    for (int x = 0; x < width; x += gridStep) {
+        RECT line{};
+        line.left = x;
+        line.top = 0;
+        line.right = x + 1;
+        line.bottom = height;
+
+        drawFilledRect(line, minorGridColor);
+    }
+
+    for (int y = 0; y < height; y += gridStep) {
+        RECT line{};
+        line.left = 0;
+        line.top = y;
+        line.right = width;
+        line.bottom = y + 1;
+
+        drawFilledRect(line, minorGridColor);
+    }
+}
+
+void D3DCanvasRenderer::drawVisualWindows(
+    const std::vector<VisualWindowDrawItem>& items
+) {
+    constexpr float windowColor[] = {0.105f, 0.125f, 0.17f, 1.0f};
+    constexpr float titleColor[] = {0.145f, 0.175f, 0.235f, 1.0f};
+    constexpr float borderColor[] = {0.33f, 0.48f, 0.82f, 1.0f};
+
+    for (const VisualWindowDrawItem& item : items) {
+        RECT rect = item.visualRect;
+
+        drawFilledRect(rect, windowColor);
+
+        RECT titleRect = rect;
+        titleRect.bottom = std::min(titleRect.top + 28, titleRect.bottom);
+        drawFilledRect(titleRect, titleColor);
+
+        RECT top{rect.left, rect.top, rect.right, rect.top + 2};
+        RECT bottom{rect.left, rect.bottom - 2, rect.right, rect.bottom};
+        RECT left{rect.left, rect.top, rect.left + 2, rect.bottom};
+        RECT right{rect.right - 2, rect.top, rect.right, rect.bottom};
+
+        drawFilledRect(top, borderColor);
+        drawFilledRect(bottom, borderColor);
+        drawFilledRect(left, borderColor);
+        drawFilledRect(right, borderColor);
+    }
+}
+
+void D3DCanvasRenderer::drawFilledRect(const RECT& rect, const float color[4]) {
+    if (renderTargetView_ == nullptr || !device_.isValid()) {
+        return;
+    }
+
+    RECT clipped{};
+    clipped.left = std::max<LONG>(0, rect.left);
+    clipped.top = std::max<LONG>(0, rect.top);
+    clipped.right = std::min<LONG>(rectWidth(clientRect_), rect.right);
+    clipped.bottom = std::min<LONG>(rectHeight(clientRect_), rect.bottom);
+
+    if (clipped.left >= clipped.right || clipped.top >= clipped.bottom) {
+        return;
+    }
+
+    D3D11_RECT d3dRect{};
+    d3dRect.left = clipped.left;
+    d3dRect.top = clipped.top;
+    d3dRect.right = clipped.right;
+    d3dRect.bottom = clipped.bottom;
+
+    ID3D11DeviceContext1* context1 = device_.context1();
+
+    if (context1 == nullptr) {
+        return;
+    }
+
+    context1->ClearView(
+        renderTargetView_.Get(),
+        color,
+        &d3dRect,
+        1
+    );
+}
 

@@ -1,10 +1,5 @@
 #pragma once
 
-#include "rendering/ICanvasRenderer.h"
-
-#include "workspace/CanvasTypes.h"
-#include "workspace/WorkspaceModel.h"
-
 #include <functional>
 
 #include <windows.h>
@@ -23,16 +18,7 @@ public:
     void show();
     void hide();
 
-    void setRenderer(ICanvasRenderer* renderer);
     void setResizeCallback(std::function<void(const RECT&)> callback);
-
-    void setSnapshot(
-        const WorkspaceModel* workspace,
-        CanvasCamera camera,
-        RECT workArea
-    );
-
-    void repaint();
 
     HWND hwnd() const {
         return hwnd_;
@@ -53,10 +39,5 @@ private:
 private:
     HWND hwnd_{nullptr};
 
-    ICanvasRenderer* renderer_{nullptr};
     std::function<void(const RECT&)> resizeCallback_{};
-
-    const WorkspaceModel* workspace_{nullptr};
-    CanvasCamera camera_{};
-    RECT workArea_{};
 };

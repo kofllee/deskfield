@@ -3,7 +3,7 @@
 #include <utility>
 
 namespace {
-    constexpr wchar_t OverlayClassName[] = L"DeskfieldOverlayWindow";
+    constexpr wchar_t CanvasHostClassName[] = L"DeskfieldCanvasHostWindow";
 
     int rectWidth(const RECT& rect) {
         return rect.right - rect.left;
@@ -23,15 +23,13 @@ bool CanvasHostWindow::create(const RECT& workArea) {
         return false;
     }
 
-    workArea_ = workArea;
-
     HINSTANCE instance = GetModuleHandleW(nullptr);
 
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.hInstance = instance;
     wc.lpfnWndProc = CanvasHostWindow::windowProc;
-    wc.lpszClassName = OverlayClassName;
+    wc.lpszClassName = CanvasHostClassName;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     wc.hbrBackground = nullptr;
 
@@ -39,7 +37,7 @@ bool CanvasHostWindow::create(const RECT& workArea) {
 
     hwnd_ = CreateWindowExW(
         WS_EX_APPWINDOW,
-        OverlayClassName,
+        CanvasHostClassName,
         L"Deskfield",
         WS_POPUP,
         workArea.left,
@@ -52,11 +50,7 @@ bool CanvasHostWindow::create(const RECT& workArea) {
         this
     );
 
-    if (hwnd_ == nullptr) {
-        return false;
-    }
-
-    return true;
+    return hwnd_ != nullptr;
 }
 
 void CanvasHostWindow::destroy() {
@@ -79,40 +73,8 @@ void CanvasHostWindow::hide() {
     }
 }
 
-void CanvasHostWindow::setRenderer(ICanvasRenderer* renderer) {
-    renderer_ = renderer;
-}
-
 void CanvasHostWindow::setResizeCallback(std::function<void(const RECT&)> callback) {
     resizeCallback_ = std::move(callback);
-}
-
-void CanvasHostWindow::setSnapshot(
-    const WorkspaceModel* workspace,
-    CanvasCamera camera,
-    RECT workArea
-) {
-    workspace_ = workspace;
-    camera_ = camera;
-    workArea_ = workArea;
-
-    if (hwnd_ != nullptr) {
-        SetWindowPos(
-            hwnd_,
-            HWND_TOPMOST,
-            workArea.left,
-            workArea.top,
-            rectWidth(workArea),
-            rectHeight(workArea),
-            SWP_NOACTIVATE | SWP_NOOWNERZORDER
-        );
-    }
-}
-
-void CanvasHostWindow::repaint() {
-    if (hwnd_ != nullptr) {
-        InvalidateRect(hwnd_, nullptr, FALSE);
-    }
 }
 
 LRESULT CanvasHostWindow::windowProc(
@@ -193,50 +155,6 @@ LRESULT CanvasHostWindow::handleMessage(
 
 void CanvasHostWindow::paint() {
     PAINTSTRUCT ps{};
-    HDC hdc = BeginPaint(hwnd_, &ps);
-
-    RECT clientRect{};
-    GetClientRect(hwnd_, &clientRect);
-
-    HDC memoryDc = CreateCompatibleDC(hdc);
-
-    HBITMAP bitmap = CreateCompatibleBitmap(
-        hdc,
-        rectWidth(clientRect),
-        rectHeight(clientRect)
-    );
-
-    HGDIOBJ oldBitmap = SelectObject(memoryDc, bitmap);
-
-    if (renderer_ != nullptr && workspace_ != nullptr) {
-        renderer_->render(
-            memoryDc,
-            clientRect,
-            *workspace_,
-            camera_,
-            workArea_
-        );
-    } else {
-        HBRUSH background = CreateSolidBrush(RGB(8, 10, 14));
-        FillRect(memoryDc, &clientRect, background);
-        DeleteObject(background);
-    }
-
-    BitBlt(
-        hdc,
-        0,
-        0,
-        rectWidth(clientRect),
-        rectHeight(clientRect),
-        memoryDc,
-        0,
-        0,
-        SRCCOPY
-    );
-
-    SelectObject(memoryDc, oldBitmap);
-    DeleteObject(bitmap);
-    DeleteDC(memoryDc);
-
+    BeginPaint(hwnd_, &ps);
     EndPaint(hwnd_, &ps);
 }

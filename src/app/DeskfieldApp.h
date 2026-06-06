@@ -2,7 +2,7 @@
 
 #include "features/NativeLayoutSynchronizer.h"
 
-#include "overlay/CanvasHostWindow.h"
+#include "canvas/CanvasHostWindow.h"
 
 #include "windowing/WindowController.h"
 #include "windowing/WindowEnumerator.h"
@@ -38,7 +38,7 @@ private:
     void updateMode();
     void syncWindows();
     void applyWindowStateChanges();
-    void renderOverlay();
+    void renderCanvas();
 
     void registerInitialWindows();
 
@@ -59,7 +59,7 @@ private:
     NativeLayoutSynchronizer nativeLayoutSynchronizer_{};
 
     GdiDebugCanvasRenderer debugCanvasRenderer_{};
-    CanvasHostWindow overlay_{};
+    CanvasHostWindow canvasHost_{};
     D3DCanvasRenderer d3dCanvasRenderer_{};
 
     CanvasCameraController cameraController_{};

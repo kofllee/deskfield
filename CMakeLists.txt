@@ -22,8 +22,8 @@ add_executable(Deskfield
         src/features/NativeLayoutSynchronizer.cpp
         src/features/NativeLayoutSynchronizer.h
 
-        src/overlay/CanvasHostWindow.cpp
-        src/overlay/CanvasHostWindow.h
+        src/canvas/CanvasHostWindow.cpp
+        src/canvas/CanvasHostWindow.h
         src/app/DeskfieldMode.h
         src/workspace/CanvasCameraController.cpp
         src/workspace/CanvasCameraController.h
@@ -53,6 +53,7 @@ add_executable(Deskfield
         src/rendering/CapturedWindowRenderer.h
         src/platform/Win32Dpi.cpp
         src/platform/Win32Dpi.h
+        src/rendering/VisualWindowDrawItem.h
 )
 
 target_include_directories(Deskfield PRIVATE

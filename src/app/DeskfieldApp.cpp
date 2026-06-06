@@ -10,24 +10,24 @@ bool DeskfieldApp::initialize() {
 
     const RECT workArea = getPrimaryWorkArea();
 
-    if (!overlay_.create(workArea)) {
+    if (!canvasHost_.create(workArea)) {
         std::wcout << L"Failed to create Deskfield surface. Error: " << GetLastError() << L"\n";
         return false;
     }
 
-    overlay_.setResizeCallback(
+    canvasHost_.setResizeCallback(
         [this](const RECT& clientRect) {
             d3dCanvasRenderer_.resize(clientRect);
         }
     );
 
-    if (!d3dCanvasRenderer_.initialize(overlay_.hwnd())) {
+    if (!d3dCanvasRenderer_.initialize(canvasHost_.hwnd())) {
         std::wcout << L"D3D renderer failed to initialize\n";
     } else {
         std::wcout << L"D3D renderer initialized\n";
     }
 
-    overlay_.show();
+    canvasHost_.show();
 
     camera_.x = 0.0;
     camera_.y = 0.0;
@@ -86,7 +86,7 @@ void DeskfieldApp::tick(double deltaSeconds) {
         );
     }
 
-    renderOverlay();
+    renderCanvas();
 }
 
 void DeskfieldApp::processInput(double) {
@@ -179,24 +179,16 @@ void DeskfieldApp::applyWindowStateChanges() {
     }
 }
 
-void DeskfieldApp::renderOverlay() {
+void DeskfieldApp::renderCanvas() {
     const RECT workArea = getPrimaryWorkArea();
 
-    if (d3dCanvasRenderer_.isInitialized()) {
-        d3dCanvasRenderer_.render(
-            workspace_,
-            camera_,
-            workArea
-        );
-    }
-
-    // overlay_.setSnapshot(
-    //     &workspace_,
-    //     camera_,
-    //     workArea
-    // );
-    //
-    // overlay_.repaint();
+    d3dCanvasRenderer_.render(
+        workspace_,
+        camera_,
+        workArea,
+        mapper_
+    );
+    
 }
 
 void DeskfieldApp::registerInitialWindows() {

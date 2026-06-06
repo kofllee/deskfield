@@ -1,14 +1,18 @@
 #pragma once
 
 #include "rendering/D3DDevice.h"
+#include "rendering/VisualWindowDrawItem.h"
 
 #include "workspace/CanvasTypes.h"
+#include "workspace/ViewportMapper.h"
 #include "workspace/WorkspaceModel.h"
 
 #include <d3d11.h>
 #include <dxgi.h>
 #include <wrl/client.h>
 #include <windows.h>
+
+#include <vector>
 
 class D3DCanvasRenderer {
 public:
@@ -26,7 +30,8 @@ public:
     void render(
         const WorkspaceModel& workspace,
         const CanvasCamera& camera,
-        const RECT& workArea
+        const RECT& workArea,
+        const ViewportMapper& mapper
     );
 
     D3DDevice& device() {
@@ -46,9 +51,19 @@ private:
     bool createRenderTarget();
     void releaseRenderTarget();
 
+    std::vector<VisualWindowDrawItem> buildVisualWindowDrawItems(
+        const WorkspaceModel& workspace,
+        const CanvasCamera& camera,
+        const RECT& workArea,
+        const ViewportMapper& mapper
+    ) const;
+
+    void drawCanvasGrid();
+    void drawVisualWindows(const std::vector<VisualWindowDrawItem>& items);
+    void drawFilledRect(const RECT& rect, const float color[4]);
+
     static int rectWidth(const RECT& rect);
     static int rectHeight(const RECT& rect);
-
 
 private:
     HWND targetWindow_{nullptr};
