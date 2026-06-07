@@ -25,6 +25,12 @@ bool DeskfieldApp::initialize() {
         std::wcout << L"D3D renderer failed to initialize\n";
     } else {
         std::wcout << L"D3D renderer initialized\n";
+
+        if (!graphicsCaptureManager_.initialize(d3dCanvasRenderer_.device().device())) {
+            std::wcout << L"Graphics capture manager failed to initialize\n";
+        } else {
+            std::wcout << L"Graphics capture manager initialized\n";
+        }
     }
 
     canvasHost_.show();
@@ -59,6 +65,10 @@ int DeskfieldApp::run() {
 
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
+
+    graphicsCaptureManager_.shutdown();
+    d3dCanvasRenderer_.shutdown();
+    canvasHost_.destroy();
 
     return 0;
 }

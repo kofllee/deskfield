@@ -51,6 +51,10 @@ add_executable(Deskfield
         src/platform/Win32Dpi.cpp
         src/platform/Win32Dpi.h
         src/rendering/VisualWindowDrawItem.h
+        src/platform/GraphicsCaptureInterop.cpp
+        src/platform/GraphicsCaptureInterop.h
+        src/platform/Direct3DWinRtInterop.cpp
+        src/platform/Direct3DWinRtInterop.h
 )
 
 target_include_directories(Deskfield PRIVATE
@@ -61,6 +65,11 @@ target_compile_definitions(Deskfield PRIVATE
         UNICODE
         _UNICODE
         WIN32_LEAN_AND_MEAN
+        NOMINMAX
+)
+
+target_compile_options(Deskfield PRIVATE
+        /await
 )
 
 target_link_libraries(Deskfield PRIVATE
@@ -68,4 +77,6 @@ target_link_libraries(Deskfield PRIVATE
         dwmapi
         d3d11
         dxgi
+        windowsapp
+        runtimeobject
 )
