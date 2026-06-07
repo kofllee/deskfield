@@ -7,6 +7,9 @@
 #include <winrt/Windows.Graphics.DirectX.h>
 #include <wrl/client.h>
 
+#include <chrono>
+#include <limits>
+
 #include <utility>
 
 bool GraphicsCaptureManager::initialize(ID3D11Device* d3dDevice) {
@@ -71,10 +74,6 @@ void GraphicsCaptureManager::detachAll() {
 }
 
 void GraphicsCaptureManager::update() {
-    if (dirtyWindows_.empty()) {
-        return;
-    }
-
     auto dirty = std::move(dirtyWindows_);
     dirtyWindows_.clear();
 
@@ -86,6 +85,25 @@ void GraphicsCaptureManager::update() {
         }
 
         drainFrames(it->second);
+    }
+
+    const auto now = std::chrono::steady_clock::now();
+    constexpr double staleSeconds = 0.75;
+
+    for (auto& [id, captured] : capturedWindows_) {
+        if (!captured.attached || !captured.captureStarted) {
+            captured.captureFailed = true;
+            captured.captureStale = false;
+            continue;
+        }
+
+        if (captured.latestTexture == nullptr || captured.framesReceived == 0) {
+            captured.captureStale = false;
+            continue;
+        }
+
+        const std::chrono::duration<double> age = now - captured.lastFrameTime;
+        captured.captureStale = age.count() > staleSeconds;
     }
 }
 
@@ -106,7 +124,7 @@ const CapturedWindow* GraphicsCaptureManager::find(WindowId id) const {
 ID3D11Texture2D* GraphicsCaptureManager::latestTexture(WindowId id) const {
     const CapturedWindow* captured = find(id);
 
-    if (captured == nullptr || !captured->frameAvailable) {
+    if (captured == nullptr || captured->latestTexture == nullptr) {
         return nullptr;
     }
 
@@ -120,7 +138,41 @@ SIZE GraphicsCaptureManager::sourceSize(WindowId id) const {
         return {};
     }
 
+    if (captured->frameContentSize.cx > 0 && captured->frameContentSize.cy > 0) {
+        return captured->frameContentSize;
+    }
+
     return captured->sourceSize;
+}
+
+CaptureStatus GraphicsCaptureManager::captureStatus(WindowId id) const {
+    CaptureStatus status{};
+
+    const CapturedWindow* captured = find(id);
+
+    if (captured == nullptr) {
+        return status;
+    }
+
+    status.attached = captured->attached;
+    status.hasTexture = captured->latestTexture != nullptr;
+    status.fresh = status.hasTexture && !captured->captureStale && !captured->captureFailed;
+    status.stale = status.hasTexture && captured->captureStale;
+    status.failed = captured->captureFailed;
+
+    status.framesReceived = captured->framesReceived;
+    status.sourceSize = captured->sourceSize;
+    status.frameContentSize = captured->frameContentSize;
+
+    if (captured->framesReceived > 0) {
+        const auto now = std::chrono::steady_clock::now();
+        const std::chrono::duration<double> age = now - captured->lastFrameTime;
+        status.secondsSinceLastFrame = age.count();
+    } else {
+        status.secondsSinceLastFrame = std::numeric_limits<double>::infinity();
+    }
+
+    return status;
 }
 
 bool GraphicsCaptureManager::createCaptureForWindow(CapturedWindow& captured) {
@@ -135,6 +187,11 @@ bool GraphicsCaptureManager::createCaptureForWindow(CapturedWindow& captured) {
 
     captured.sourceSize.cx = size.Width;
     captured.sourceSize.cy = size.Height;
+
+    captured.frameContentSize = captured.sourceSize;
+    captured.captureFailed = false;
+    captured.captureStale = false;
+    captured.framesReceived = 0;
 
     if (captured.sourceSize.cx <= 0 || captured.sourceSize.cy <= 0) {
         captured.attached = false;
@@ -155,6 +212,8 @@ bool GraphicsCaptureManager::createCaptureForWindow(CapturedWindow& captured) {
     }
 
     captured.session = captured.framePool.CreateCaptureSession(captured.item);
+
+    captured.session.IsCursorCaptureEnabled(false);
 
     if (captured.session == nullptr) {
         captured.attached = false;
@@ -203,6 +262,11 @@ void GraphicsCaptureManager::closeCapture(CapturedWindow& captured) {
     captured.captureStarted = false;
     captured.frameAvailable = false;
     captured.frameDirty = false;
+    captured.frameContentSize = {};
+    captured.captureFailed = false;
+    captured.captureStale = false;
+    captured.framesReceived = 0;
+    captured.lastFrameTime = {};
     captured.sourceSize = {};
 }
 
@@ -220,6 +284,7 @@ void GraphicsCaptureManager::drainFrames(CapturedWindow& captured) {
     if (!captured.attached || !captured.captureStarted || captured.framePool == nullptr) {
         captured.frameAvailable = false;
         captured.frameDirty = false;
+        captured.captureFailed = true;
         return;
     }
 
@@ -251,12 +316,24 @@ void GraphicsCaptureManager::drainFrames(CapturedWindow& captured) {
         captured.latestTexture = texture;
 
         const auto contentSize = frame.ContentSize();
-        captured.sourceSize.cx = contentSize.Width;
-        captured.sourceSize.cy = contentSize.Height;
+
+        captured.frameContentSize.cx = contentSize.Width;
+        captured.frameContentSize.cy = contentSize.Height;
+
+        if (captured.frameContentSize.cx > 0 && captured.frameContentSize.cy > 0) {
+            captured.sourceSize = captured.frameContentSize;
+        }
 
         gotFrame = true;
     }
 
-    captured.frameAvailable = gotFrame || captured.latestTexture != nullptr;
+    if (gotFrame) {
+        captured.framesReceived += 1;
+        captured.lastFrameTime = std::chrono::steady_clock::now();
+        captured.captureFailed = false;
+        captured.captureStale = false;
+    }
+
+    captured.frameAvailable = captured.latestTexture != nullptr;
     captured.frameDirty = false;
 }

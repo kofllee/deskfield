@@ -11,6 +11,21 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <cstdint>
+
+struct CaptureStatus {
+    bool attached{};
+    bool hasTexture{};
+    bool fresh{};
+    bool stale{};
+    bool failed{};
+
+    std::uint64_t framesReceived{};
+    double secondsSinceLastFrame{};
+
+    SIZE sourceSize{};
+    SIZE frameContentSize{};
+};
 
 class GraphicsCaptureManager {
 public:
@@ -28,6 +43,8 @@ public:
 
     ID3D11Texture2D* latestTexture(WindowId id) const;
     SIZE sourceSize(WindowId id) const;
+
+    CaptureStatus captureStatus(WindowId id) const;
 
 private:
     bool createCaptureForWindow(CapturedWindow& captured);

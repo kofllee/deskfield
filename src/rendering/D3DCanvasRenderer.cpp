@@ -1,10 +1,12 @@
 #include "D3DCanvasRenderer.h"
 
-#include <utility>
 #include <algorithm>
 #include <cmath>
-#include <d3dcompiler.h>
+#include <cstdlib>
 #include <cstring>
+#include <utility>
+
+#include <d3dcompiler.h>
 
 namespace {
     constexpr float BackgroundColor[] = {
@@ -13,6 +15,9 @@ namespace {
         0.055f,
         1.0f
     };
+
+    constexpr int TitleBarHeight = 30;
+    constexpr int BorderThickness = 2;
 
     constexpr char TextureVertexShaderSource[] = R"(
     struct VSInput {
@@ -46,6 +51,10 @@ namespace {
         return sourceTexture.Sample(sourceSampler, input.uv);
     }
     )";
+
+    bool isEmptyRect(const RECT& rect) {
+        return rect.left >= rect.right || rect.top >= rect.bottom;
+    }
 }
 
 D3DCanvasRenderer::~D3DCanvasRenderer() {
@@ -95,6 +104,14 @@ void D3DCanvasRenderer::shutdown() {
     clientRect_ = {};
 }
 
+D3DDevice& D3DCanvasRenderer::device() {
+    return device_;
+}
+
+const D3DDevice& D3DCanvasRenderer::device() const {
+    return device_;
+}
+
 void D3DCanvasRenderer::resize(const RECT& clientRect) {
     clientRect_ = clientRect;
 
@@ -135,7 +152,7 @@ void D3DCanvasRenderer::render(
     const RECT& workArea,
     const ViewportMapper& mapper,
     const GraphicsCaptureManager& captureManager
-){
+) {
     if (!initialized_ || !device_.isValid() || renderTargetView_ == nullptr) {
         return;
     }
@@ -197,7 +214,7 @@ std::vector<VisualWindowDrawItem> D3DCanvasRenderer::buildVisualWindowDrawItems(
         if (window.state == DeskfieldWindowState::Closed ||
             window.state == DeskfieldWindowState::Hidden) {
             continue;
-            }
+        }
 
         RECT visualRect = mapper.mapCanvasToVisualRect(
             window.canvasRect,
@@ -205,25 +222,57 @@ std::vector<VisualWindowDrawItem> D3DCanvasRenderer::buildVisualWindowDrawItems(
             workArea
         );
 
+        visualRect.top -= static_cast<LONG>(
+            static_cast<double>(TitleBarHeight) * camera.zoom
+        );
+
         if (visualRect.right <= 0 ||
             visualRect.bottom <= 0 ||
             visualRect.left >= rectWidth(clientRect_) ||
             visualRect.top >= rectHeight(clientRect_)) {
             continue;
-            }
+        }
 
-        ID3D11Texture2D* texture = captureManager.latestTexture(window.id);
-        const SIZE sourceSize = captureManager.sourceSize(window.id);
+        const int scaledTitleHeight = std::max(
+            18,
+            static_cast<int>(static_cast<double>(TitleBarHeight) * camera.zoom)
+        );
+
+        RECT titleRect = visualRect;
+        titleRect.bottom = std::min<LONG>(
+            titleRect.top + scaledTitleHeight,
+            visualRect.bottom
+        );
+
+        RECT contentRect = visualRect;
+        contentRect.top = titleRect.bottom;
+
+        if (isEmptyRect(contentRect)) {
+            continue;
+        }
+
+        const CaptureStatus captureStatus = captureManager.captureStatus(window.id);
 
         VisualWindowDrawItem item{};
         item.id = window.id;
+
         item.visualRect = visualRect;
+        item.titleRect = titleRect;
+        item.contentRect = contentRect;
+
         item.title = window.title;
-        item.texture = texture;
-        item.sourceSize = sourceSize;
+        item.state = window.state;
+
+        item.texture = captureManager.latestTexture(window.id);
+        item.sourceSize = captureManager.sourceSize(window.id);
+
         item.selected = window.selected;
-        item.focused = false;
-        item.captureAvailable = texture != nullptr;
+        item.focused = window.state == DeskfieldWindowState::NativeInteractive;
+
+        item.captureAvailable = captureStatus.hasTexture;
+        item.captureFresh = captureStatus.fresh;
+        item.captureStale = captureStatus.stale;
+        item.captureFailed = captureStatus.failed;
 
         items.push_back(std::move(item));
     }
@@ -237,6 +286,7 @@ bool D3DCanvasRenderer::createSwapChain() {
     }
 
     Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
+
     HRESULT result = device_.device()->QueryInterface(
         __uuidof(IDXGIDevice),
         reinterpret_cast<void**>(dxgiDevice.GetAddressOf())
@@ -247,6 +297,7 @@ bool D3DCanvasRenderer::createSwapChain() {
     }
 
     Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
+
     result = dxgiDevice->GetAdapter(adapter.GetAddressOf());
 
     if (FAILED(result)) {
@@ -254,6 +305,7 @@ bool D3DCanvasRenderer::createSwapChain() {
     }
 
     Microsoft::WRL::ComPtr<IDXGIFactory> factory;
+
     result = adapter->GetParent(
         __uuidof(IDXGIFactory),
         reinterpret_cast<void**>(factory.GetAddressOf())
@@ -398,31 +450,78 @@ void D3DCanvasRenderer::drawVisualWindows(
     const std::vector<VisualWindowDrawItem>& items
 ) {
     constexpr float windowColor[] = {0.105f, 0.125f, 0.17f, 1.0f};
+    constexpr float minimizedColor[] = {0.075f, 0.085f, 0.115f, 1.0f};
+
     constexpr float titleColor[] = {0.145f, 0.175f, 0.235f, 1.0f};
+    constexpr float staleTitleColor[] = {0.165f, 0.145f, 0.105f, 1.0f};
+
     constexpr float borderColor[] = {0.33f, 0.48f, 0.82f, 1.0f};
+    constexpr float selectedBorderColor[] = {0.52f, 0.68f, 1.0f, 1.0f};
 
     for (const VisualWindowDrawItem& item : items) {
-        RECT rect = item.visualRect;
+        const bool minimized =
+            item.state == DeskfieldWindowState::CanvasMinimized;
 
-        if (item.captureAvailable && item.texture != nullptr) {
+        drawFilledRect(
+            item.visualRect,
+            minimized ? minimizedColor : windowColor
+        );
+
+        if (!minimized && item.captureAvailable && item.texture != nullptr) {
             drawCapturedTexture(item);
         } else {
-            drawFilledRect(rect, windowColor);
+            drawFilledRect(
+                item.contentRect,
+                minimized ? minimizedColor : windowColor
+            );
         }
 
-        RECT titleRect = rect;
-        titleRect.bottom = std::min(titleRect.top + 28, titleRect.bottom);
-        drawFilledRect(titleRect, titleColor);
+        drawFilledRect(
+            item.titleRect,
+            item.captureStale || item.captureFailed
+                ? staleTitleColor
+                : titleColor
+        );
 
-        RECT top{rect.left, rect.top, rect.right, rect.top + 2};
-        RECT bottom{rect.left, rect.bottom - 2, rect.right, rect.bottom};
-        RECT left{rect.left, rect.top, rect.left + 2, rect.bottom};
-        RECT right{rect.right - 2, rect.top, rect.right, rect.bottom};
+        const float* currentBorderColor =
+            item.selected || item.focused
+                ? selectedBorderColor
+                : borderColor;
 
-        drawFilledRect(top, borderColor);
-        drawFilledRect(bottom, borderColor);
-        drawFilledRect(left, borderColor);
-        drawFilledRect(right, borderColor);
+        const RECT rect = item.visualRect;
+
+        RECT top{
+            rect.left,
+            rect.top,
+            rect.right,
+            rect.top + BorderThickness
+        };
+
+        RECT bottom{
+            rect.left,
+            rect.bottom - BorderThickness,
+            rect.right,
+            rect.bottom
+        };
+
+        RECT left{
+            rect.left,
+            rect.top,
+            rect.left + BorderThickness,
+            rect.bottom
+        };
+
+        RECT right{
+            rect.right - BorderThickness,
+            rect.top,
+            rect.right,
+            rect.bottom
+        };
+
+        drawFilledRect(top, currentBorderColor);
+        drawFilledRect(bottom, currentBorderColor);
+        drawFilledRect(left, currentBorderColor);
+        drawFilledRect(right, currentBorderColor);
     }
 }
 
@@ -466,7 +565,8 @@ void D3DCanvasRenderer::drawCapturedTexture(const VisualWindowDrawItem& item) {
         return;
     }
 
-    const RECT originalRect = item.visualRect;
+    const RECT originalRect = snapRectToPixels(item.contentRect);
+
     RECT clippedRect = originalRect;
 
     clippedRect.left = std::max<LONG>(0, clippedRect.left);
@@ -474,12 +574,16 @@ void D3DCanvasRenderer::drawCapturedTexture(const VisualWindowDrawItem& item) {
     clippedRect.right = std::min<LONG>(rectWidth(clientRect_), clippedRect.right);
     clippedRect.bottom = std::min<LONG>(rectHeight(clientRect_), clippedRect.bottom);
 
-    if (clippedRect.left >= clippedRect.right || clippedRect.top >= clippedRect.bottom) {
+    if (clippedRect.left >= clippedRect.right ||
+        clippedRect.top >= clippedRect.bottom) {
         return;
     }
 
-    const float originalWidth = static_cast<float>(originalRect.right - originalRect.left);
-    const float originalHeight = static_cast<float>(originalRect.bottom - originalRect.top);
+    const float originalWidth =
+        static_cast<float>(originalRect.right - originalRect.left);
+
+    const float originalHeight =
+        static_cast<float>(originalRect.bottom - originalRect.top);
 
     if (originalWidth <= 0.0f || originalHeight <= 0.0f) {
         return;
@@ -487,10 +591,13 @@ void D3DCanvasRenderer::drawCapturedTexture(const VisualWindowDrawItem& item) {
 
     const float u0 =
         static_cast<float>(clippedRect.left - originalRect.left) / originalWidth;
+
     const float v0 =
         static_cast<float>(clippedRect.top - originalRect.top) / originalHeight;
+
     const float u1 =
         static_cast<float>(clippedRect.right - originalRect.left) / originalWidth;
+
     const float v1 =
         static_cast<float>(clippedRect.bottom - originalRect.top) / originalHeight;
 
@@ -508,6 +615,10 @@ void D3DCanvasRenderer::drawCapturedTexture(const VisualWindowDrawItem& item) {
 
     const float width = static_cast<float>(rectWidth(clientRect_));
     const float height = static_cast<float>(rectHeight(clientRect_));
+
+    if (width <= 0.0f || height <= 0.0f) {
+        return;
+    }
 
     auto toNdcX = [width](LONG x) {
         return (static_cast<float>(x) / width) * 2.0f - 1.0f;
@@ -551,10 +662,15 @@ void D3DCanvasRenderer::drawCapturedTexture(const VisualWindowDrawItem& item) {
 
     context->IASetInputLayout(textureInputLayout_.Get());
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+    ID3D11Buffer* vertexBuffers[] = {
+        vertexBuffer.Get()
+    };
+
     context->IASetVertexBuffers(
         0,
         1,
-        vertexBuffer.GetAddressOf(),
+        vertexBuffers,
         &stride,
         &offset
     );
@@ -565,41 +681,17 @@ void D3DCanvasRenderer::drawCapturedTexture(const VisualWindowDrawItem& item) {
     ID3D11ShaderResourceView* srv = textureView.Get();
     context->PSSetShaderResources(0, 1, &srv);
 
-    ID3D11SamplerState* sampler = textureSampler_.Get();
+    ID3D11SamplerState* sampler =
+        shouldUsePointSampling(item)
+            ? texturePointSampler_.Get()
+            : textureLinearSampler_.Get();
+
     context->PSSetSamplers(0, 1, &sampler);
 
     context->Draw(4, 0);
 
     ID3D11ShaderResourceView* emptySrv[] = {nullptr};
     context->PSSetShaderResources(0, 1, emptySrv);
-}
-
-bool D3DCanvasRenderer::ensureTexturePipeline() {
-    if (textureVertexShader_ != nullptr &&
-        texturePixelShader_ != nullptr &&
-        textureInputLayout_ != nullptr &&
-        textureSampler_ != nullptr) {
-        return true;
-    }
-
-    releaseTexturePipeline();
-
-    if (!createTextureShaders()) {
-        releaseTexturePipeline();
-        return false;
-    }
-
-    if (!createTextureInputLayout()) {
-        releaseTexturePipeline();
-        return false;
-    }
-
-    if (!createTextureSampler()) {
-        releaseTexturePipeline();
-        return false;
-    }
-
-    return true;
 }
 
 bool D3DCanvasRenderer::createTextureShaders() {
@@ -701,27 +793,116 @@ bool D3DCanvasRenderer::createTextureInputLayout() {
     return textureInputLayout_ != nullptr;
 }
 
-bool D3DCanvasRenderer::createTextureSampler() {
-    D3D11_SAMPLER_DESC desc{};
-    desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-    desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
-    desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-    desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
-    desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
-    desc.MinLOD = 0;
-    desc.MaxLOD = D3D11_FLOAT32_MAX;
+bool D3DCanvasRenderer::createTextureSamplers() {
+    D3D11_SAMPLER_DESC linearDesc{};
+    linearDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    linearDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+    linearDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+    linearDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+    linearDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    linearDesc.MinLOD = 0;
+    linearDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-    const HRESULT result = device_.device()->CreateSamplerState(
-        &desc,
-        textureSampler_.GetAddressOf()
+    HRESULT result = device_.device()->CreateSamplerState(
+        &linearDesc,
+        textureLinearSampler_.GetAddressOf()
+    );
+
+    if (FAILED(result)) {
+        return false;
+    }
+
+    D3D11_SAMPLER_DESC pointDesc{};
+    pointDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+    pointDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+    pointDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+    pointDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+    pointDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    pointDesc.MinLOD = 0;
+    pointDesc.MaxLOD = D3D11_FLOAT32_MAX;
+
+    result = device_.device()->CreateSamplerState(
+        &pointDesc,
+        texturePointSampler_.GetAddressOf()
     );
 
     return SUCCEEDED(result);
 }
 
 void D3DCanvasRenderer::releaseTexturePipeline() {
-    textureSampler_.Reset();
+    texturePointSampler_.Reset();
+    textureLinearSampler_.Reset();
+
     textureInputLayout_.Reset();
     texturePixelShader_.Reset();
     textureVertexShader_.Reset();
+}
+
+bool D3DCanvasRenderer::ensureTexturePipeline() {
+    if (textureVertexShader_ != nullptr &&
+        texturePixelShader_ != nullptr &&
+        textureInputLayout_ != nullptr &&
+        textureLinearSampler_ != nullptr &&
+        texturePointSampler_ != nullptr) {
+        return true;
+        }
+
+    releaseTexturePipeline();
+
+    if (!createTextureShaders()) {
+        releaseTexturePipeline();
+        return false;
+    }
+
+    if (!createTextureInputLayout()) {
+        releaseTexturePipeline();
+        return false;
+    }
+
+    if (!createTextureSamplers()) {
+        releaseTexturePipeline();
+        return false;
+    }
+
+    return true;
+}
+
+bool D3DCanvasRenderer::shouldUsePointSampling(
+    const VisualWindowDrawItem& item
+) {
+    if (item.sourceSize.cx <= 0 || item.sourceSize.cy <= 0) {
+        return true;
+    }
+
+    const int drawWidth = rectWidth(item.contentRect);
+    const int drawHeight = rectHeight(item.contentRect);
+
+    if (drawWidth <= 0 || drawHeight <= 0) {
+        return true;
+    }
+
+    const double scaleX =
+        static_cast<double>(drawWidth) /
+        static_cast<double>(item.sourceSize.cx);
+
+    const double scaleY =
+        static_cast<double>(drawHeight) /
+        static_cast<double>(item.sourceSize.cy);
+
+    const double scale = std::min(scaleX, scaleY);
+
+    return scale >= 0.90;
+}
+
+RECT D3DCanvasRenderer::snapRectToPixels(
+    const RECT& rect
+) {
+    RECT snapped{};
+
+    snapped.left = rect.left;
+    snapped.top = rect.top;
+    snapped.right = rect.right;
+    snapped.bottom = rect.bottom;
+
+    return snapped;
 }

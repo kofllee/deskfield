@@ -33,13 +33,23 @@ void WorkspaceModel::addWindow(
     window.canvasRect = makeInitialCanvasRect(snapshot, camera);
     window.savedNormalCanvasRect = window.canvasRect;
 
-    window.state = stateFromSnapshot(snapshot);
+    window.state = snapshot.minimized
+        ? DeskfieldWindowState::CanvasMinimized
+        : DeskfieldWindowState::Normal;
+
+    window.native = makeNativeState(snapshot);
     window.captureEnabled = true;
 
     windows_.push_back(window);
 }
 
 void WorkspaceModel::removeWindow(WindowId id) {
+    CanvasWindow* window = findById(id);
+
+    if (window != nullptr) {
+        window->state = DeskfieldWindowState::Closed;
+    }
+
     windows_.erase(
         std::remove_if(
             windows_.begin(),
@@ -79,29 +89,23 @@ void WorkspaceModel::updateNativeState(
     }
 
     updateMetadata(id, snapshot);
+    window->native = makeNativeState(snapshot);
+
+    if (window->state == DeskfieldWindowState::Closed ||
+        window->state == DeskfieldWindowState::Hidden ||
+        window->state == DeskfieldWindowState::CanvasFullscreen ||
+        window->state == DeskfieldWindowState::NativeInteractive) {
+        return;
+    }
 
     if (snapshot.minimized) {
-        window->state = DeskfieldWindowState::NativeMinimized;
+        window->state = DeskfieldWindowState::CanvasMinimized;
         return;
     }
 
-    if (snapshot.maximized) {
-        if (window->state != DeskfieldWindowState::NativeMaximized) {
-            window->savedNormalCanvasRect = window->canvasRect;
-        }
-
-        window->state = DeskfieldWindowState::NativeMaximized;
-        return;
-    }
-
-    if (window->state == DeskfieldWindowState::NativeMaximized) {
-        window->canvasRect = window->savedNormalCanvasRect;
-    }
-
-    if (window->state == DeskfieldWindowState::NativeMinimized ||
-        window->state == DeskfieldWindowState::NativeMaximized) {
+    if (window->state == DeskfieldWindowState::CanvasMinimized) {
         window->state = DeskfieldWindowState::Normal;
-        }
+    }
 }
 
 void WorkspaceModel::setCanvasRect(WindowId id, const CanvasRect& rect) {
@@ -119,6 +123,11 @@ void WorkspaceModel::setState(WindowId id, DeskfieldWindowState state) {
 
     if (window == nullptr) {
         return;
+    }
+
+    if (state == DeskfieldWindowState::CanvasFullscreen &&
+        window->state != DeskfieldWindowState::CanvasFullscreen) {
+        window->savedNormalCanvasRect = window->canvasRect;
     }
 
     window->state = state;
@@ -184,7 +193,13 @@ CanvasRect WorkspaceModel::makeInitialCanvasRect(
     const WindowSnapshot& snapshot,
     const CanvasCamera& camera
 ) {
-    CanvasRect rect = rectToCanvasRect(snapshot.normalRect);
+    RECT sourceRect = snapshot.rect;
+
+    if (!snapshot.maximized && !snapshot.minimized) {
+        sourceRect = snapshot.normalRect;
+    }
+
+    CanvasRect rect = rectToCanvasRect(sourceRect);
 
     rect.x += camera.x;
     rect.y += camera.y;
@@ -192,16 +207,18 @@ CanvasRect WorkspaceModel::makeInitialCanvasRect(
     return rect;
 }
 
-DeskfieldWindowState WorkspaceModel::stateFromSnapshot(
+NativeSourceState WorkspaceModel::makeNativeState(
     const WindowSnapshot& snapshot
 ) {
-    if (snapshot.minimized) {
-        return DeskfieldWindowState::NativeMinimized;
-    }
+    NativeSourceState state{};
 
-    if (snapshot.maximized) {
-        return DeskfieldWindowState::NativeMaximized;
-    }
+    state.nativeRect = snapshot.rect;
+    state.normalNativeRect = snapshot.normalRect;
 
-    return DeskfieldWindowState::Normal;
+    state.visible = snapshot.visible;
+    state.minimized = snapshot.minimized;
+    state.maximized = snapshot.maximized;
+    state.cloaked = snapshot.cloaked;
+
+    return state;
 }

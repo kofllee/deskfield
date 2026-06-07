@@ -9,7 +9,7 @@ void NativeLayoutSynchronizer::synchronize(
     SourceWindowHost& sourceWindowHost
 ) {
     for (const CanvasWindow& window : workspace.windows()) {
-        sourceWindowHost.applyNativeLayout(
+        sourceWindowHost.applyPlacement(
             window,
             camera,
             workArea,

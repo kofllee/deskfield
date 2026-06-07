@@ -7,15 +7,28 @@
 #include "windowing/WindowSnapshot.h"
 
 #include <windows.h>
+
 #include <vector>
 
 enum class DeskfieldWindowState {
     Normal,
-    Hidden,
+    CanvasMinimized,
     CanvasFullscreen,
-    NativeMinimized,
-    NativeMaximized,
+    CaptureOnly,
+    NativeInteractive,
+    Hidden,
+    Unavailable,
     Closed
+};
+
+struct NativeSourceState {
+    RECT nativeRect{};
+    RECT normalNativeRect{};
+
+    bool visible{};
+    bool minimized{};
+    bool maximized{};
+    bool cloaked{};
 };
 
 struct CanvasWindow {
@@ -30,6 +43,7 @@ struct CanvasWindow {
     CanvasRect savedNormalCanvasRect{};
 
     DeskfieldWindowState state{DeskfieldWindowState::Normal};
+    NativeSourceState native{};
 
     bool selected{};
     bool captureEnabled{true};
@@ -75,7 +89,7 @@ private:
         const CanvasCamera& camera
     );
 
-    static DeskfieldWindowState stateFromSnapshot(
+    static NativeSourceState makeNativeState(
         const WindowSnapshot& snapshot
     );
 

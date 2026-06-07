@@ -8,11 +8,22 @@
 
 #include <windows.h>
 
+#include <unordered_map>
+
+enum class SourcePlacementMode {
+    None,
+    VisibleBackground,
+    InteractiveViewport,
+    Parked,
+    HiddenIfSafe,
+    CanvasFullscreen
+};
+
 class SourceWindowHost {
 public:
-    bool canApplyNativeLayout(const CanvasWindow& window) const;
+    SourcePlacementMode resolvePlacement(const CanvasWindow& window) const;
 
-    bool applyNativeLayout(
+    bool applyPlacement(
         const CanvasWindow& window,
         const CanvasCamera& camera,
         const RECT& workArea,
@@ -24,10 +35,22 @@ public:
     void clear();
 
 private:
+    bool applyInteractiveViewport(
+        const CanvasWindow& window,
+        const CanvasCamera& camera,
+        const RECT& workArea,
+        const ViewportMapper& mapper,
+        const WindowController& controller
+    );
+
+    bool parkWindow(
+        const CanvasWindow& window,
+        const WindowController& controller
+    );
+
     bool shouldSkipUnchangedRect(HWND hwnd, const RECT& rect) const;
     void rememberAppliedRect(HWND hwnd, const RECT& rect);
 
 private:
     std::unordered_map<HWND, RECT> lastAppliedRects_{};
 };
-

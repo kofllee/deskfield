@@ -85,16 +85,14 @@ void DeskfieldApp::tick(double deltaSeconds) {
 
     const RECT workArea = getPrimaryWorkArea();
 
-    if (mode_ == DeskfieldMode::Interactive) {
-        nativeLayoutSynchronizer_.synchronize(
-            workspace_,
-            camera_,
-            workArea,
-            mapper_,
-            controller_,
-            sourceWindowHost_
-        );
-    }
+    nativeLayoutSynchronizer_.synchronize(
+        workspace_,
+        camera_,
+        workArea,
+        mapper_,
+        controller_,
+        sourceWindowHost_
+    );
 
     renderCanvas();
 }

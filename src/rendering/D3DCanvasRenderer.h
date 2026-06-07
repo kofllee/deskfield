@@ -1,19 +1,26 @@
 #pragma once
 
-#include "rendering/D3DDevice.h"
-#include "rendering/VisualWindowDrawItem.h"
+#include "D3DDevice.h"
+#include "VisualWindowDrawItem.h"
 
+#include "capture/GraphicsCaptureManager.h"
 #include "workspace/CanvasTypes.h"
 #include "workspace/ViewportMapper.h"
 #include "workspace/WorkspaceModel.h"
-#include "capture/GraphicsCaptureManager.h"
 
 #include <d3d11.h>
 #include <dxgi.h>
-#include <wrl/client.h>
 #include <windows.h>
+#include <wrl/client.h>
 
 #include <vector>
+
+struct TextureVertex {
+    float x{};
+    float y{};
+    float u{};
+    float v{};
+};
 
 class D3DCanvasRenderer {
 public:
@@ -36,57 +43,60 @@ public:
         const GraphicsCaptureManager& captureManager
     );
 
-    D3DDevice& device() {
-        return device_;
-    }
-
-    const D3DDevice& device() const {
-        return device_;
-    }
-
-    bool isInitialized() const {
-        return initialized_;
-    }
+    D3DDevice& device();
+    const D3DDevice& device() const;
 
 private:
-    struct TextureVertex {
-        float x;
-        float y;
-        float u;
-        float v;
-    };
+    std::vector<VisualWindowDrawItem> buildVisualWindowDrawItems(
+        const WorkspaceModel& workspace,
+        const CanvasCamera& camera,
+        const RECT& workArea,
+        const ViewportMapper& mapper,
+        const GraphicsCaptureManager& captureManager
+    ) const;
 
     bool createSwapChain();
     bool createRenderTarget();
     void releaseRenderTarget();
 
-    std::vector<VisualWindowDrawItem> buildVisualWindowDrawItems(
-        const WorkspaceModel& workspace,
-        const CanvasCamera& camera,
-        const RECT& canvasArea,
-        const ViewportMapper& mapper,
-        const GraphicsCaptureManager& captureManager
-    ) const;
-
     void drawCanvasGrid(
         const CanvasCamera& camera,
         const RECT& canvasArea
     );
-    void drawVisualWindows(const std::vector<VisualWindowDrawItem>& items);
-    void drawFilledRect(const RECT& rect, const float color[4]);
+
+    void drawVisualWindows(
+        const std::vector<VisualWindowDrawItem>& items
+    );
+
+    void drawFilledRect(
+        const RECT& rect,
+        const float color[4]
+    );
+
+    void drawCapturedTexture(
+        const VisualWindowDrawItem& item
+    );
+
+    bool ensureTexturePipeline();
+    bool createTextureShaders();
+    bool createTextureInputLayout();
+    bool createTextureSamplers();
+    void releaseTexturePipeline();
+
+    static bool shouldUsePointSampling(
+        const VisualWindowDrawItem& item
+    );
+
+    static RECT snapRectToPixels(
+        const RECT& rect
+    );
 
     static int rectWidth(const RECT& rect);
     static int rectHeight(const RECT& rect);
 
-    void drawCapturedTexture(const VisualWindowDrawItem& item);
-    bool ensureTexturePipeline();
-    bool createTextureShaders();
-    bool createTextureSampler();
-    bool createTextureInputLayout();
-    void releaseTexturePipeline();
-
 private:
-    HWND targetWindow_{nullptr};
+    HWND targetWindow_{};
+
     D3DDevice device_{};
 
     Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain_{};
@@ -95,9 +105,11 @@ private:
     Microsoft::WRL::ComPtr<ID3D11VertexShader> textureVertexShader_{};
     Microsoft::WRL::ComPtr<ID3D11PixelShader> texturePixelShader_{};
     Microsoft::WRL::ComPtr<ID3D11InputLayout> textureInputLayout_{};
-    Microsoft::WRL::ComPtr<ID3D11SamplerState> textureSampler_{};
+
+    Microsoft::WRL::ComPtr<ID3D11SamplerState> textureLinearSampler_{};
+    Microsoft::WRL::ComPtr<ID3D11SamplerState> texturePointSampler_{};
 
     RECT clientRect_{};
 
-    bool initialized_{false};
+    bool initialized_{};
 };

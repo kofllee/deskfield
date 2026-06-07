@@ -44,10 +44,7 @@ add_executable(Deskfield
         src/rendering/D3DDevice.h
         src/rendering/D3DCanvasRenderer.cpp
         src/rendering/D3DCanvasRenderer.h
-        src/rendering/CanvasGridRenderer.cpp
-        src/rendering/CanvasGridRenderer.h
-        src/rendering/CapturedWindowRenderer.cpp
-        src/rendering/CapturedWindowRenderer.h
+        
         src/platform/Win32Dpi.cpp
         src/platform/Win32Dpi.h
         src/rendering/VisualWindowDrawItem.h

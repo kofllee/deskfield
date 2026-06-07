@@ -11,6 +11,9 @@
 
 #include <wrl/client.h>
 
+#include <chrono>
+#include <cstdint>
+
 struct CapturedWindow {
     WindowId id{};
     HWND hwnd{};
@@ -22,10 +25,17 @@ struct CapturedWindow {
     winrt::event_token frameArrivedToken{};
 
     Microsoft::WRL::ComPtr<ID3D11Texture2D> latestTexture{};
+
     SIZE sourceSize{};
+    SIZE frameContentSize{};
 
     bool attached{};
     bool frameAvailable{};
     bool frameDirty{};
     bool captureStarted{};
+    bool captureFailed{};
+    bool captureStale{};
+
+    std::uint64_t framesReceived{};
+    std::chrono::steady_clock::time_point lastFrameTime{};
 };
