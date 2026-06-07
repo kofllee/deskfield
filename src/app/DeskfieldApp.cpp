@@ -196,7 +196,8 @@ void DeskfieldApp::renderCanvas() {
         workspace_,
         camera_,
         workArea,
-        mapper_
+        mapper_,
+        graphicsCaptureManager_
     );
 }
 

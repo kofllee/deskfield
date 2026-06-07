@@ -6,6 +6,7 @@
 #include "workspace/CanvasTypes.h"
 #include "workspace/ViewportMapper.h"
 #include "workspace/WorkspaceModel.h"
+#include "capture/GraphicsCaptureManager.h"
 
 #include <d3d11.h>
 #include <dxgi.h>
@@ -31,7 +32,8 @@ public:
         const WorkspaceModel& workspace,
         const CanvasCamera& camera,
         const RECT& workArea,
-        const ViewportMapper& mapper
+        const ViewportMapper& mapper,
+        const GraphicsCaptureManager& captureManager
     );
 
     D3DDevice& device() {
@@ -47,6 +49,13 @@ public:
     }
 
 private:
+    struct TextureVertex {
+        float x;
+        float y;
+        float u;
+        float v;
+    };
+
     bool createSwapChain();
     bool createRenderTarget();
     void releaseRenderTarget();
@@ -55,7 +64,8 @@ private:
         const WorkspaceModel& workspace,
         const CanvasCamera& camera,
         const RECT& canvasArea,
-        const ViewportMapper& mapper
+        const ViewportMapper& mapper,
+        const GraphicsCaptureManager& captureManager
     ) const;
 
     void drawCanvasGrid(
@@ -68,12 +78,24 @@ private:
     static int rectWidth(const RECT& rect);
     static int rectHeight(const RECT& rect);
 
+    void drawCapturedTexture(const VisualWindowDrawItem& item);
+    bool ensureTexturePipeline();
+    bool createTextureShaders();
+    bool createTextureSampler();
+    bool createTextureInputLayout();
+    void releaseTexturePipeline();
+
 private:
     HWND targetWindow_{nullptr};
     D3DDevice device_{};
 
     Microsoft::WRL::ComPtr<IDXGISwapChain> swapChain_{};
     Microsoft::WRL::ComPtr<ID3D11RenderTargetView> renderTargetView_{};
+
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> textureVertexShader_{};
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> texturePixelShader_{};
+    Microsoft::WRL::ComPtr<ID3D11InputLayout> textureInputLayout_{};
+    Microsoft::WRL::ComPtr<ID3D11SamplerState> textureSampler_{};
 
     RECT clientRect_{};
 

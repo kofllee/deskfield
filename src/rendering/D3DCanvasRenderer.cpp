@@ -3,6 +3,8 @@
 #include <utility>
 #include <algorithm>
 #include <cmath>
+#include <d3dcompiler.h>
+#include <cstring>
 
 namespace {
     constexpr float BackgroundColor[] = {
@@ -11,6 +13,39 @@ namespace {
         0.055f,
         1.0f
     };
+
+    constexpr char TextureVertexShaderSource[] = R"(
+    struct VSInput {
+        float2 position : POSITION;
+        float2 uv : TEXCOORD0;
+    };
+
+    struct VSOutput {
+        float4 position : SV_POSITION;
+        float2 uv : TEXCOORD0;
+    };
+
+    VSOutput main(VSInput input) {
+        VSOutput output;
+        output.position = float4(input.position, 0.0f, 1.0f);
+        output.uv = input.uv;
+        return output;
+    }
+    )";
+
+    constexpr char TexturePixelShaderSource[] = R"(
+    Texture2D sourceTexture : register(t0);
+    SamplerState sourceSampler : register(s0);
+
+    struct PSInput {
+        float4 position : SV_POSITION;
+        float2 uv : TEXCOORD0;
+    };
+
+    float4 main(PSInput input) : SV_TARGET {
+        return sourceTexture.Sample(sourceSampler, input.uv);
+    }
+    )";
 }
 
 D3DCanvasRenderer::~D3DCanvasRenderer() {
@@ -48,6 +83,7 @@ bool D3DCanvasRenderer::initialize(HWND targetWindow) {
 void D3DCanvasRenderer::shutdown() {
     initialized_ = false;
 
+    releaseTexturePipeline();
     releaseRenderTarget();
 
     if (swapChain_ != nullptr) {
@@ -97,8 +133,9 @@ void D3DCanvasRenderer::render(
     const WorkspaceModel& workspace,
     const CanvasCamera& camera,
     const RECT& workArea,
-    const ViewportMapper& mapper
-) {
+    const ViewportMapper& mapper,
+    const GraphicsCaptureManager& captureManager
+){
     if (!initialized_ || !device_.isValid() || renderTargetView_ == nullptr) {
         return;
     }
@@ -138,7 +175,8 @@ void D3DCanvasRenderer::render(
         workspace,
         camera,
         canvasArea,
-        mapper
+        mapper,
+        captureManager
     );
 
     drawVisualWindows(items);
@@ -150,7 +188,8 @@ std::vector<VisualWindowDrawItem> D3DCanvasRenderer::buildVisualWindowDrawItems(
     const WorkspaceModel& workspace,
     const CanvasCamera& camera,
     const RECT& workArea,
-    const ViewportMapper& mapper
+    const ViewportMapper& mapper,
+    const GraphicsCaptureManager& captureManager
 ) const {
     std::vector<VisualWindowDrawItem> items;
 
@@ -158,7 +197,7 @@ std::vector<VisualWindowDrawItem> D3DCanvasRenderer::buildVisualWindowDrawItems(
         if (window.state == DeskfieldWindowState::Closed ||
             window.state == DeskfieldWindowState::Hidden) {
             continue;
-        }
+            }
 
         RECT visualRect = mapper.mapCanvasToVisualRect(
             window.canvasRect,
@@ -171,15 +210,20 @@ std::vector<VisualWindowDrawItem> D3DCanvasRenderer::buildVisualWindowDrawItems(
             visualRect.left >= rectWidth(clientRect_) ||
             visualRect.top >= rectHeight(clientRect_)) {
             continue;
-        }
+            }
+
+        ID3D11Texture2D* texture = captureManager.latestTexture(window.id);
+        const SIZE sourceSize = captureManager.sourceSize(window.id);
 
         VisualWindowDrawItem item{};
         item.id = window.id;
         item.visualRect = visualRect;
         item.title = window.title;
+        item.texture = texture;
+        item.sourceSize = sourceSize;
         item.selected = window.selected;
         item.focused = false;
-        item.captureAvailable = window.captureEnabled;
+        item.captureAvailable = texture != nullptr;
 
         items.push_back(std::move(item));
     }
@@ -360,7 +404,11 @@ void D3DCanvasRenderer::drawVisualWindows(
     for (const VisualWindowDrawItem& item : items) {
         RECT rect = item.visualRect;
 
-        drawFilledRect(rect, windowColor);
+        if (item.captureAvailable && item.texture != nullptr) {
+            drawCapturedTexture(item);
+        } else {
+            drawFilledRect(rect, windowColor);
+        }
 
         RECT titleRect = rect;
         titleRect.bottom = std::min(titleRect.top + 28, titleRect.bottom);
@@ -413,3 +461,267 @@ void D3DCanvasRenderer::drawFilledRect(const RECT& rect, const float color[4]) {
     );
 }
 
+void D3DCanvasRenderer::drawCapturedTexture(const VisualWindowDrawItem& item) {
+    if (item.texture == nullptr || !ensureTexturePipeline()) {
+        return;
+    }
+
+    const RECT originalRect = item.visualRect;
+    RECT clippedRect = originalRect;
+
+    clippedRect.left = std::max<LONG>(0, clippedRect.left);
+    clippedRect.top = std::max<LONG>(0, clippedRect.top);
+    clippedRect.right = std::min<LONG>(rectWidth(clientRect_), clippedRect.right);
+    clippedRect.bottom = std::min<LONG>(rectHeight(clientRect_), clippedRect.bottom);
+
+    if (clippedRect.left >= clippedRect.right || clippedRect.top >= clippedRect.bottom) {
+        return;
+    }
+
+    const float originalWidth = static_cast<float>(originalRect.right - originalRect.left);
+    const float originalHeight = static_cast<float>(originalRect.bottom - originalRect.top);
+
+    if (originalWidth <= 0.0f || originalHeight <= 0.0f) {
+        return;
+    }
+
+    const float u0 =
+        static_cast<float>(clippedRect.left - originalRect.left) / originalWidth;
+    const float v0 =
+        static_cast<float>(clippedRect.top - originalRect.top) / originalHeight;
+    const float u1 =
+        static_cast<float>(clippedRect.right - originalRect.left) / originalWidth;
+    const float v1 =
+        static_cast<float>(clippedRect.bottom - originalRect.top) / originalHeight;
+
+    Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> textureView;
+
+    const HRESULT srvResult = device_.device()->CreateShaderResourceView(
+        item.texture,
+        nullptr,
+        textureView.GetAddressOf()
+    );
+
+    if (FAILED(srvResult)) {
+        return;
+    }
+
+    const float width = static_cast<float>(rectWidth(clientRect_));
+    const float height = static_cast<float>(rectHeight(clientRect_));
+
+    auto toNdcX = [width](LONG x) {
+        return (static_cast<float>(x) / width) * 2.0f - 1.0f;
+    };
+
+    auto toNdcY = [height](LONG y) {
+        return 1.0f - (static_cast<float>(y) / height) * 2.0f;
+    };
+
+    TextureVertex vertices[] = {
+        {toNdcX(clippedRect.left),  toNdcY(clippedRect.top),    u0, v0},
+        {toNdcX(clippedRect.right), toNdcY(clippedRect.top),    u1, v0},
+        {toNdcX(clippedRect.left),  toNdcY(clippedRect.bottom), u0, v1},
+        {toNdcX(clippedRect.right), toNdcY(clippedRect.bottom), u1, v1},
+    };
+
+    D3D11_BUFFER_DESC bufferDesc{};
+    bufferDesc.ByteWidth = sizeof(vertices);
+    bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+    bufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+    D3D11_SUBRESOURCE_DATA bufferData{};
+    bufferData.pSysMem = vertices;
+
+    Microsoft::WRL::ComPtr<ID3D11Buffer> vertexBuffer;
+
+    const HRESULT bufferResult = device_.device()->CreateBuffer(
+        &bufferDesc,
+        &bufferData,
+        vertexBuffer.GetAddressOf()
+    );
+
+    if (FAILED(bufferResult)) {
+        return;
+    }
+
+    constexpr UINT stride = sizeof(TextureVertex);
+    constexpr UINT offset = 0;
+
+    ID3D11DeviceContext* context = device_.context();
+
+    context->IASetInputLayout(textureInputLayout_.Get());
+    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+    context->IASetVertexBuffers(
+        0,
+        1,
+        vertexBuffer.GetAddressOf(),
+        &stride,
+        &offset
+    );
+
+    context->VSSetShader(textureVertexShader_.Get(), nullptr, 0);
+    context->PSSetShader(texturePixelShader_.Get(), nullptr, 0);
+
+    ID3D11ShaderResourceView* srv = textureView.Get();
+    context->PSSetShaderResources(0, 1, &srv);
+
+    ID3D11SamplerState* sampler = textureSampler_.Get();
+    context->PSSetSamplers(0, 1, &sampler);
+
+    context->Draw(4, 0);
+
+    ID3D11ShaderResourceView* emptySrv[] = {nullptr};
+    context->PSSetShaderResources(0, 1, emptySrv);
+}
+
+bool D3DCanvasRenderer::ensureTexturePipeline() {
+    if (textureVertexShader_ != nullptr &&
+        texturePixelShader_ != nullptr &&
+        textureInputLayout_ != nullptr &&
+        textureSampler_ != nullptr) {
+        return true;
+    }
+
+    releaseTexturePipeline();
+
+    if (!createTextureShaders()) {
+        releaseTexturePipeline();
+        return false;
+    }
+
+    if (!createTextureInputLayout()) {
+        releaseTexturePipeline();
+        return false;
+    }
+
+    if (!createTextureSampler()) {
+        releaseTexturePipeline();
+        return false;
+    }
+
+    return true;
+}
+
+bool D3DCanvasRenderer::createTextureShaders() {
+    Microsoft::WRL::ComPtr<ID3DBlob> vertexBlob;
+    Microsoft::WRL::ComPtr<ID3DBlob> pixelBlob;
+    Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
+
+    HRESULT result = D3DCompile(
+        TextureVertexShaderSource,
+        std::strlen(TextureVertexShaderSource),
+        nullptr,
+        nullptr,
+        nullptr,
+        "main",
+        "vs_5_0",
+        0,
+        0,
+        vertexBlob.GetAddressOf(),
+        errorBlob.GetAddressOf()
+    );
+
+    if (FAILED(result)) {
+        return false;
+    }
+
+    result = D3DCompile(
+        TexturePixelShaderSource,
+        std::strlen(TexturePixelShaderSource),
+        nullptr,
+        nullptr,
+        nullptr,
+        "main",
+        "ps_5_0",
+        0,
+        0,
+        pixelBlob.GetAddressOf(),
+        errorBlob.ReleaseAndGetAddressOf()
+    );
+
+    if (FAILED(result)) {
+        return false;
+    }
+
+    result = device_.device()->CreateVertexShader(
+        vertexBlob->GetBufferPointer(),
+        vertexBlob->GetBufferSize(),
+        nullptr,
+        textureVertexShader_.GetAddressOf()
+    );
+
+    if (FAILED(result)) {
+        return false;
+    }
+
+    result = device_.device()->CreatePixelShader(
+        pixelBlob->GetBufferPointer(),
+        pixelBlob->GetBufferSize(),
+        nullptr,
+        texturePixelShader_.GetAddressOf()
+    );
+
+    if (FAILED(result)) {
+        return false;
+    }
+
+    D3D11_INPUT_ELEMENT_DESC layout[] = {
+        {
+            "POSITION",
+            0,
+            DXGI_FORMAT_R32G32_FLOAT,
+            0,
+            0,
+            D3D11_INPUT_PER_VERTEX_DATA,
+            0
+        },
+        {
+            "TEXCOORD",
+            0,
+            DXGI_FORMAT_R32G32_FLOAT,
+            0,
+            sizeof(float) * 2,
+            D3D11_INPUT_PER_VERTEX_DATA,
+            0
+        }
+    };
+
+    result = device_.device()->CreateInputLayout(
+        layout,
+        2,
+        vertexBlob->GetBufferPointer(),
+        vertexBlob->GetBufferSize(),
+        textureInputLayout_.GetAddressOf()
+    );
+
+    return SUCCEEDED(result);
+}
+
+bool D3DCanvasRenderer::createTextureInputLayout() {
+    return textureInputLayout_ != nullptr;
+}
+
+bool D3DCanvasRenderer::createTextureSampler() {
+    D3D11_SAMPLER_DESC desc{};
+    desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+    desc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+    desc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+    desc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+    desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    desc.MinLOD = 0;
+    desc.MaxLOD = D3D11_FLOAT32_MAX;
+
+    const HRESULT result = device_.device()->CreateSamplerState(
+        &desc,
+        textureSampler_.GetAddressOf()
+    );
+
+    return SUCCEEDED(result);
+}
+
+void D3DCanvasRenderer::releaseTexturePipeline() {
+    textureSampler_.Reset();
+    textureInputLayout_.Reset();
+    texturePixelShader_.Reset();
+    textureVertexShader_.Reset();
+}

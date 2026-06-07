@@ -77,6 +77,7 @@ target_link_libraries(Deskfield PRIVATE
         dwmapi
         d3d11
         dxgi
+        d3dcompiler
         windowsapp
         runtimeobject
 )
