@@ -135,9 +135,6 @@ LRESULT CanvasHostWindow::handleMessage(
         case WM_ERASEBKGND:
             return 1;
 
-        case WM_NCDESTROY:
-            return DefWindowProcW(hwnd_, msg, wParam, lParam);
-
         case WM_SIZE: {
             if (resizeCallback_) {
                 RECT clientRect{};
@@ -147,6 +144,9 @@ LRESULT CanvasHostWindow::handleMessage(
 
             return 0;
         }
+
+        case WM_NCDESTROY:
+            return DefWindowProcW(hwnd_, msg, wParam, lParam);
 
         default:
             return DefWindowProcW(hwnd_, msg, wParam, lParam);

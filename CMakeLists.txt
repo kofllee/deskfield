@@ -34,9 +34,6 @@ add_executable(Deskfield
         src/workspace/WindowId.h
         src/workspace/WindowRegistry.cpp
         src/workspace/WindowRegistry.h
-        src/rendering/ICanvasRenderer.h
-        src/rendering/GdiDebugCanvasRenderer.cpp
-        src/rendering/GdiDebugCanvasRenderer.h
         src/windowing/SourceWindowHost.cpp
         src/windowing/SourceWindowHost.h
         src/capture/CapturedWindow.cpp

@@ -14,7 +14,6 @@
 #include "workspace/WorkspaceModel.h"
 #include "workspace/WindowRegistry.h"
 
-#include "rendering/GdiDebugCanvasRenderer.h"
 #include "rendering/D3DCanvasRenderer.h"
 
 #include "capture/GraphicsCaptureManager.h"
@@ -58,7 +57,6 @@ private:
     GraphicsCaptureManager graphicsCaptureManager_{};
     NativeLayoutSynchronizer nativeLayoutSynchronizer_{};
 
-    GdiDebugCanvasRenderer debugCanvasRenderer_{};
     CanvasHostWindow canvasHost_{};
     D3DCanvasRenderer d3dCanvasRenderer_{};
 

@@ -54,11 +54,14 @@ private:
     std::vector<VisualWindowDrawItem> buildVisualWindowDrawItems(
         const WorkspaceModel& workspace,
         const CanvasCamera& camera,
-        const RECT& workArea,
+        const RECT& canvasArea,
         const ViewportMapper& mapper
     ) const;
 
-    void drawCanvasGrid();
+    void drawCanvasGrid(
+        const CanvasCamera& camera,
+        const RECT& canvasArea
+    );
     void drawVisualWindows(const std::vector<VisualWindowDrawItem>& items);
     void drawFilledRect(const RECT& rect, const float color[4]);
 

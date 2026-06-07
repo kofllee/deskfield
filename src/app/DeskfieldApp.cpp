@@ -188,7 +188,6 @@ void DeskfieldApp::renderCanvas() {
         workArea,
         mapper_
     );
-    
 }
 
 void DeskfieldApp::registerInitialWindows() {

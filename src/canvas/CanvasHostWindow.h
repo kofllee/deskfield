@@ -1,8 +1,8 @@
 #pragma once
 
-#include <functional>
-
 #include <windows.h>
+
+#include <functional>
 
 class CanvasHostWindow {
 public:
@@ -38,6 +38,5 @@ private:
 
 private:
     HWND hwnd_{nullptr};
-
     std::function<void(const RECT&)> resizeCallback_{};
 };

@@ -1,7 +1,7 @@
 #include "D3DCanvasRenderer.h"
 
+#include <utility>
 #include <algorithm>
-#include <array>
 #include <cmath>
 
 namespace {
@@ -126,12 +126,18 @@ void D3DCanvasRenderer::render(
         BackgroundColor
     );
 
-    drawCanvasGrid();
+    RECT canvasArea{};
+    canvasArea.left = 0;
+    canvasArea.top = 0;
+    canvasArea.right = rectWidth(clientRect_);
+    canvasArea.bottom = rectHeight(clientRect_);
+
+    drawCanvasGrid(camera, canvasArea);
 
     const auto items = buildVisualWindowDrawItems(
         workspace,
         camera,
-        workArea,
+        canvasArea,
         mapper
     );
 
@@ -152,7 +158,7 @@ std::vector<VisualWindowDrawItem> D3DCanvasRenderer::buildVisualWindowDrawItems(
         if (window.state == DeskfieldWindowState::Closed ||
             window.state == DeskfieldWindowState::Hidden) {
             continue;
-            }
+        }
 
         RECT visualRect = mapper.mapCanvasToVisualRect(
             window.canvasRect,
@@ -165,7 +171,7 @@ std::vector<VisualWindowDrawItem> D3DCanvasRenderer::buildVisualWindowDrawItems(
             visualRect.left >= rectWidth(clientRect_) ||
             visualRect.top >= rectHeight(clientRect_)) {
             continue;
-            }
+        }
 
         VisualWindowDrawItem item{};
         item.id = window.id;
@@ -288,29 +294,57 @@ int D3DCanvasRenderer::rectHeight(const RECT& rect) {
     return rect.bottom - rect.top;
 }
 
-void D3DCanvasRenderer::drawCanvasGrid() {
+void D3DCanvasRenderer::drawCanvasGrid(
+    const CanvasCamera& camera,
+    const RECT& canvasArea
+) {
     constexpr float minorGridColor[] = {0.075f, 0.085f, 0.11f, 1.0f};
-    constexpr int gridStep = 64;
+    constexpr int gridStep = 128;
 
     const int width = rectWidth(clientRect_);
     const int height = rectHeight(clientRect_);
 
-    for (int x = 0; x < width; x += gridStep) {
+    const double scaledStep = static_cast<double>(gridStep) * camera.zoom;
+
+    if (scaledStep < 8.0) {
+        return;
+    }
+
+    const double originX =
+        static_cast<double>(canvasArea.left) -
+        camera.x * camera.zoom;
+
+    const double originY =
+        static_cast<double>(canvasArea.top) -
+        camera.y * camera.zoom;
+
+    double startX = std::fmod(originX, scaledStep);
+    double startY = std::fmod(originY, scaledStep);
+
+    if (startX < 0.0) {
+        startX += scaledStep;
+    }
+
+    if (startY < 0.0) {
+        startY += scaledStep;
+    }
+
+    for (double x = startX; x < width; x += scaledStep) {
         RECT line{};
-        line.left = x;
+        line.left = static_cast<LONG>(x);
         line.top = 0;
-        line.right = x + 1;
+        line.right = line.left + 1;
         line.bottom = height;
 
         drawFilledRect(line, minorGridColor);
     }
 
-    for (int y = 0; y < height; y += gridStep) {
+    for (double y = startY; y < height; y += scaledStep) {
         RECT line{};
         line.left = 0;
-        line.top = y;
+        line.top = static_cast<LONG>(y);
         line.right = width;
-        line.bottom = y + 1;
+        line.bottom = line.top + 1;
 
         drawFilledRect(line, minorGridColor);
     }
