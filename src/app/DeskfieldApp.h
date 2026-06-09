@@ -18,6 +18,8 @@
 
 #include "capture/GraphicsCaptureManager.h"
 
+#include "input/WindowHitTester.h"
+
 #include "DeskfieldMode.h"
 
 #include <windows.h>
@@ -37,6 +39,10 @@ private:
     void syncWindows();
     void applyWindowStateChanges();
     void renderCanvas();
+
+    void handleCanvasLeftMouseDown(POINT clientPoint);
+    void activateCanvasWindow(WindowId id);
+    void clearNativeInteractionExcept(WindowId id);
 
     void registerInitialWindows();
 
@@ -58,6 +64,8 @@ private:
 
     CanvasHostWindow canvasHost_{};
     D3DCanvasRenderer d3dCanvasRenderer_{};
+
+    WindowHitTester windowHitTester_{};
 
     CanvasCameraController cameraController_{};
 

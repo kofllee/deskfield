@@ -1,6 +1,7 @@
 #include "CanvasHostWindow.h"
 
 #include <utility>
+#include <windowsx.h>
 
 namespace {
     constexpr wchar_t CanvasHostClassName[] = L"DeskfieldCanvasHostWindow";
@@ -148,6 +149,27 @@ LRESULT CanvasHostWindow::handleMessage(
         case WM_NCDESTROY:
             return DefWindowProcW(hwnd_, msg, wParam, lParam);
 
+        case WM_LBUTTONDOWN: {
+            SetFocus(hwnd_);
+            SetCapture(hwnd_);
+
+            POINT point{};
+            point.x = GET_X_LPARAM(lParam);
+            point.y = GET_Y_LPARAM(lParam);
+
+            if (leftMouseDownCallback_) {
+                leftMouseDownCallback_(point);
+            }
+
+            return 0;
+        }
+
+        case WM_LBUTTONUP:
+            if (GetCapture() == hwnd_) {
+                ReleaseCapture();
+            }
+            return 0;
+
         default:
             return DefWindowProcW(hwnd_, msg, wParam, lParam);
     }
@@ -157,4 +179,8 @@ void CanvasHostWindow::paint() {
     PAINTSTRUCT ps{};
     BeginPaint(hwnd_, &ps);
     EndPaint(hwnd_, &ps);
+}
+
+void CanvasHostWindow::setLeftMouseDownCallback(MouseButtonCallback callback) {
+    leftMouseDownCallback_ = std::move(callback);
 }

@@ -6,11 +6,10 @@
 
 class CanvasHostWindow {
 public:
-    CanvasHostWindow() = default;
-    ~CanvasHostWindow();
+    using ResizeCallback = std::function<void(const RECT&)>;
+    using MouseButtonCallback = std::function<void(POINT)>;
 
-    CanvasHostWindow(const CanvasHostWindow&) = delete;
-    CanvasHostWindow& operator=(const CanvasHostWindow&) = delete;
+    ~CanvasHostWindow();
 
     bool create(const RECT& workArea);
     void destroy();
@@ -18,11 +17,12 @@ public:
     void show();
     void hide();
 
-    void setResizeCallback(std::function<void(const RECT&)> callback);
-
     HWND hwnd() const {
         return hwnd_;
     }
+
+    void setResizeCallback(ResizeCallback callback);
+    void setLeftMouseDownCallback(MouseButtonCallback callback);
 
 private:
     static LRESULT CALLBACK windowProc(
@@ -32,11 +32,17 @@ private:
         LPARAM lParam
     );
 
-    LRESULT handleMessage(UINT msg, WPARAM wParam, LPARAM lParam);
+    LRESULT handleMessage(
+        UINT msg,
+        WPARAM wParam,
+        LPARAM lParam
+    );
 
     void paint();
 
 private:
     HWND hwnd_{nullptr};
-    std::function<void(const RECT&)> resizeCallback_{};
+
+    ResizeCallback resizeCallback_{};
+    MouseButtonCallback leftMouseDownCallback_{};
 };

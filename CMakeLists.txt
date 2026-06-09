@@ -52,6 +52,8 @@ add_executable(Deskfield
         src/platform/GraphicsCaptureInterop.h
         src/platform/Direct3DWinRtInterop.cpp
         src/platform/Direct3DWinRtInterop.h
+        src/input/WindowHitTester.cpp
+        src/input/WindowHitTester.h
 )
 
 target_include_directories(Deskfield PRIVATE

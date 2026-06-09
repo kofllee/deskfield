@@ -21,6 +21,12 @@ bool DeskfieldApp::initialize() {
         }
     );
 
+    canvasHost_.setLeftMouseDownCallback(
+        [this](POINT point) {
+            handleCanvasLeftMouseDown(point);
+        }
+    );
+
     if (!d3dCanvasRenderer_.initialize(canvasHost_.hwnd())) {
         std::wcout << L"D3D renderer failed to initialize\n";
     } else {
@@ -217,4 +223,53 @@ RECT DeskfieldApp::getPrimaryWorkArea() {
     RECT workArea{};
     SystemParametersInfoW(SPI_GETWORKAREA, 0, &workArea, 0);
     return workArea;
+}
+
+void DeskfieldApp::handleCanvasLeftMouseDown(POINT clientPoint) {
+    RECT clientRect{};
+    GetClientRect(canvasHost_.hwnd(), &clientRect);
+
+    const WindowHitResult hit = windowHitTester_.hitTest(
+        clientPoint,
+        workspace_,
+        camera_,
+        clientRect,
+        mapper_
+    );
+
+    if (!hit.hit()) {
+        clearNativeInteractionExcept({});
+        return;
+    }
+
+    activateCanvasWindow(hit.id);
+}
+
+void DeskfieldApp::activateCanvasWindow(WindowId id) {
+    CanvasWindow* target = workspace_.findById(id);
+
+    if (target == nullptr || target->hwnd == nullptr) {
+        return;
+    }
+
+    clearNativeInteractionExcept(id);
+
+    target->selected = true;
+    workspace_.setState(id, DeskfieldWindowState::NativeInteractive);
+
+    controller_.bringToForeground(target->hwnd);
+}
+
+void DeskfieldApp::clearNativeInteractionExcept(WindowId id) {
+    for (CanvasWindow& window : workspace_.windows()) {
+        if (window.id == id) {
+            continue;
+        }
+
+        window.selected = false;
+
+        if (window.state == DeskfieldWindowState::NativeInteractive) {
+            window.state = DeskfieldWindowState::Normal;
+        }
+    }
 }
