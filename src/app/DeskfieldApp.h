@@ -34,7 +34,6 @@ private:
     void tick(double deltaSeconds);
     void processInput(double deltaSeconds);
     void processMessages(bool& shouldQuit);
-    void updateMode();
     void syncWindows();
     void applyWindowStateChanges();
     void renderCanvas();
@@ -63,7 +62,7 @@ private:
     CanvasCameraController cameraController_{};
 
     CanvasCamera camera_{};
-    DeskfieldMode mode_{DeskfieldMode::Interactive};
+    DeskfieldMode mode_{DeskfieldMode::Canvas};
 
     int syncCounter_{0};
 };

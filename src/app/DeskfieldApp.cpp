@@ -78,7 +78,6 @@ void DeskfieldApp::tick(double deltaSeconds) {
 
     cameraController_.animate(camera_, deltaSeconds);
 
-    updateMode();
     syncWindows();
 
     graphicsCaptureManager_.update();
@@ -128,14 +127,6 @@ void DeskfieldApp::processInput(double) {
     if (GetAsyncKeyState(VK_OEM_PLUS) & 0x8000) {
         cameraController_.zoom(camera_, 1.02);
     }
-}
-
-void DeskfieldApp::updateMode() {
-    constexpr double overviewThreshold = 0.65;
-
-    mode_ = camera_.zoom < overviewThreshold
-        ? DeskfieldMode::Overview
-        : DeskfieldMode::Interactive;
 }
 
 void DeskfieldApp::syncWindows() {
