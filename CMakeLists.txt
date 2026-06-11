@@ -54,6 +54,8 @@ add_executable(Deskfield
         src/platform/Direct3DWinRtInterop.h
         src/input/WindowHitTester.cpp
         src/input/WindowHitTester.h
+        src/input/InputRouter.cpp
+        src/input/InputRouter.h
 )
 
 target_include_directories(Deskfield PRIVATE

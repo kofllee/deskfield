@@ -4,6 +4,7 @@
 
 void WorkspaceModel::clear() {
     windows_.clear();
+    selectedWindowId_ = {};
 }
 
 void WorkspaceModel::addWindow(
@@ -60,6 +61,10 @@ void WorkspaceModel::removeWindow(WindowId id) {
         ),
         windows_.end()
     );
+
+    if (selectedWindowId_ == id) {
+        selectedWindowId_ = {};
+    }
 }
 
 void WorkspaceModel::updateMetadata(
@@ -131,6 +136,31 @@ void WorkspaceModel::setState(WindowId id, DeskfieldWindowState state) {
     }
 
     window->state = state;
+}
+
+void WorkspaceModel::clearSelection() {
+    for (CanvasWindow& window : windows_) {
+        window.selected = false;
+    }
+
+    selectedWindowId_ = {};
+}
+
+void WorkspaceModel::selectWindow(WindowId id) {
+    selectedWindowId_ = {};
+
+    for (CanvasWindow& window : windows_) {
+        const bool selected = window.id == id;
+        window.selected = selected;
+
+        if (selected) {
+            selectedWindowId_ = id;
+        }
+    }
+}
+
+WindowId WorkspaceModel::selectedWindowId() const {
+    return selectedWindowId_;
 }
 
 CanvasWindow* WorkspaceModel::findById(WindowId id) {

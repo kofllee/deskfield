@@ -27,6 +27,42 @@ bool DeskfieldApp::initialize() {
         }
     );
 
+    canvasHost_.setLeftMouseUpCallback(
+        [this](POINT point) {
+            handleCanvasLeftMouseUp(point);
+        }
+    );
+
+    canvasHost_.setLeftMouseDoubleClickCallback(
+        [this](POINT point) {
+            handleCanvasLeftMouseDoubleClick(point);
+        }
+    );
+
+    canvasHost_.setMiddleMouseDownCallback(
+        [this](POINT point) {
+            handleCanvasMiddleMouseDown(point);
+        }
+    );
+
+    canvasHost_.setMiddleMouseUpCallback(
+        [this](POINT point) {
+            handleCanvasMiddleMouseUp(point);
+        }
+    );
+
+    canvasHost_.setMouseMoveCallback(
+        [this](POINT point) {
+            handleCanvasMouseMove(point);
+        }
+    );
+
+    canvasHost_.setMouseWheelCallback(
+        [this](POINT point, int wheelDelta) {
+            handleCanvasMouseWheel(point, wheelDelta);
+        }
+    );
+
     if (!d3dCanvasRenderer_.initialize(canvasHost_.hwnd())) {
         std::wcout << L"D3D renderer failed to initialize\n";
     } else {
@@ -80,7 +116,7 @@ int DeskfieldApp::run() {
 }
 
 void DeskfieldApp::tick(double deltaSeconds) {
-    processInput(deltaSeconds);
+    processKeyboardShortcuts(deltaSeconds);
 
     cameraController_.animate(camera_, deltaSeconds);
 
@@ -88,21 +124,12 @@ void DeskfieldApp::tick(double deltaSeconds) {
 
     graphicsCaptureManager_.update();
 
-    const RECT workArea = getPrimaryWorkArea();
-
-    nativeLayoutSynchronizer_.synchronize(
-        workspace_,
-        camera_,
-        workArea,
-        mapper_,
-        controller_,
-        sourceWindowHost_
-    );
+    applySourcePlacement();
 
     renderCanvas();
 }
 
-void DeskfieldApp::processInput(double) {
+void DeskfieldApp::processKeyboardShortcuts(double) {
     if (GetAsyncKeyState(VK_ESCAPE) & 0x8000) {
         PostQuitMessage(0);
         return;
@@ -184,13 +211,27 @@ void DeskfieldApp::applyWindowStateChanges() {
     }
 }
 
-void DeskfieldApp::renderCanvas() {
+void DeskfieldApp::applySourcePlacement() {
     const RECT workArea = getPrimaryWorkArea();
+
+    nativeLayoutSynchronizer_.synchronize(
+        workspace_,
+        camera_,
+        workArea,
+        mapper_,
+        controller_,
+        sourceWindowHost_
+    );
+}
+
+void DeskfieldApp::renderCanvas() {
+    RECT clientRect{};
+    GetClientRect(canvasHost_.hwnd(), &clientRect);
 
     d3dCanvasRenderer_.render(
         workspace_,
         camera_,
-        workArea,
+        clientRect,
         mapper_,
         graphicsCaptureManager_
     );
@@ -229,6 +270,28 @@ void DeskfieldApp::handleCanvasLeftMouseDown(POINT clientPoint) {
     RECT clientRect{};
     GetClientRect(canvasHost_.hwnd(), &clientRect);
 
+    inputRouter_.onLeftMouseDown(
+        clientPoint,
+        workspace_,
+        camera_,
+        clientRect,
+        mapper_,
+        windowHitTester_
+    );
+
+    if (inputRouter_.consumeClearNativeInteractionRequest()) {
+        leaveNativeInteractionExcept(workspace_.selectedWindowId());
+    }
+}
+
+void DeskfieldApp::handleCanvasLeftMouseUp(POINT) {
+    inputRouter_.onLeftMouseUp();
+}
+
+void DeskfieldApp::handleCanvasLeftMouseDoubleClick(POINT clientPoint) {
+    RECT clientRect{};
+    GetClientRect(canvasHost_.hwnd(), &clientRect);
+
     const WindowHitResult hit = windowHitTester_.hitTest(
         clientPoint,
         workspace_,
@@ -238,35 +301,61 @@ void DeskfieldApp::handleCanvasLeftMouseDown(POINT clientPoint) {
     );
 
     if (!hit.hit()) {
-        clearNativeInteractionExcept({});
+        workspace_.clearSelection();
+        leaveNativeInteractionExcept({});
         return;
     }
 
-    activateCanvasWindow(hit.id);
+    enterNativeInteraction(hit.id);
 }
 
-void DeskfieldApp::activateCanvasWindow(WindowId id) {
+void DeskfieldApp::handleCanvasMiddleMouseDown(POINT clientPoint) {
+    inputRouter_.onMiddleMouseDown(clientPoint, camera_);
+}
+
+void DeskfieldApp::handleCanvasMiddleMouseUp(POINT) {
+    inputRouter_.onMiddleMouseUp();
+}
+
+void DeskfieldApp::handleCanvasMouseMove(POINT clientPoint) {
+    inputRouter_.onMouseMove(
+        clientPoint,
+        workspace_,
+        camera_
+    );
+}
+
+void DeskfieldApp::handleCanvasMouseWheel(POINT clientPoint, int wheelDelta) {
+    const bool ctrlDown = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+
+    inputRouter_.onWheel(
+        clientPoint,
+        wheelDelta,
+        ctrlDown,
+        camera_
+    );
+}
+
+void DeskfieldApp::enterNativeInteraction(WindowId id) {
     CanvasWindow* target = workspace_.findById(id);
 
     if (target == nullptr || target->hwnd == nullptr) {
         return;
     }
 
-    clearNativeInteractionExcept(id);
+    leaveNativeInteractionExcept(id);
 
-    target->selected = true;
+    workspace_.selectWindow(id);
     workspace_.setState(id, DeskfieldWindowState::NativeInteractive);
 
     controller_.bringToForeground(target->hwnd);
 }
 
-void DeskfieldApp::clearNativeInteractionExcept(WindowId id) {
+void DeskfieldApp::leaveNativeInteractionExcept(WindowId id) {
     for (CanvasWindow& window : workspace_.windows()) {
         if (window.id == id) {
             continue;
         }
-
-        window.selected = false;
 
         if (window.state == DeskfieldWindowState::NativeInteractive) {
             window.state = DeskfieldWindowState::Normal;

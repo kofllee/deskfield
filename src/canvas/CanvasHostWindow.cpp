@@ -33,6 +33,7 @@ bool CanvasHostWindow::create(const RECT& workArea) {
     wc.lpszClassName = CanvasHostClassName;
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     wc.hbrBackground = nullptr;
+    wc.style = CS_DBLCLKS;
 
     RegisterClassExW(&wc);
 
@@ -74,8 +75,36 @@ void CanvasHostWindow::hide() {
     }
 }
 
-void CanvasHostWindow::setResizeCallback(std::function<void(const RECT&)> callback) {
+void CanvasHostWindow::setResizeCallback(ResizeCallback callback) {
     resizeCallback_ = std::move(callback);
+}
+
+void CanvasHostWindow::setLeftMouseDownCallback(MouseButtonCallback callback) {
+    leftMouseDownCallback_ = std::move(callback);
+}
+
+void CanvasHostWindow::setLeftMouseUpCallback(MouseButtonCallback callback) {
+    leftMouseUpCallback_ = std::move(callback);
+}
+
+void CanvasHostWindow::setLeftMouseDoubleClickCallback(MouseButtonCallback callback) {
+    leftMouseDoubleClickCallback_ = std::move(callback);
+}
+
+void CanvasHostWindow::setMiddleMouseDownCallback(MouseButtonCallback callback) {
+    middleMouseDownCallback_ = std::move(callback);
+}
+
+void CanvasHostWindow::setMiddleMouseUpCallback(MouseButtonCallback callback) {
+    middleMouseUpCallback_ = std::move(callback);
+}
+
+void CanvasHostWindow::setMouseMoveCallback(MouseMoveCallback callback) {
+    mouseMoveCallback_ = std::move(callback);
+}
+
+void CanvasHostWindow::setMouseWheelCallback(MouseWheelCallback callback) {
+    mouseWheelCallback_ = std::move(callback);
 }
 
 LRESULT CanvasHostWindow::windowProc(
@@ -164,11 +193,94 @@ LRESULT CanvasHostWindow::handleMessage(
             return 0;
         }
 
-        case WM_LBUTTONUP:
+        case WM_LBUTTONUP: {
+            POINT point{};
+            point.x = GET_X_LPARAM(lParam);
+            point.y = GET_Y_LPARAM(lParam);
+
+            if (leftMouseUpCallback_) {
+                leftMouseUpCallback_(point);
+            }
+
             if (GetCapture() == hwnd_) {
                 ReleaseCapture();
             }
+
             return 0;
+        }
+
+        case WM_LBUTTONDBLCLK: {
+            SetFocus(hwnd_);
+
+            POINT point{};
+            point.x = GET_X_LPARAM(lParam);
+            point.y = GET_Y_LPARAM(lParam);
+
+            if (leftMouseDoubleClickCallback_) {
+                leftMouseDoubleClickCallback_(point);
+            }
+
+            return 0;
+        }
+
+        case WM_MBUTTONDOWN: {
+            SetFocus(hwnd_);
+            SetCapture(hwnd_);
+
+            POINT point{};
+            point.x = GET_X_LPARAM(lParam);
+            point.y = GET_Y_LPARAM(lParam);
+
+            if (middleMouseDownCallback_) {
+                middleMouseDownCallback_(point);
+            }
+
+            return 0;
+        }
+
+        case WM_MBUTTONUP: {
+            POINT point{};
+            point.x = GET_X_LPARAM(lParam);
+            point.y = GET_Y_LPARAM(lParam);
+
+            if (middleMouseUpCallback_) {
+                middleMouseUpCallback_(point);
+            }
+
+            if (GetCapture() == hwnd_) {
+                ReleaseCapture();
+            }
+
+            return 0;
+        }
+
+        case WM_MOUSEMOVE: {
+            POINT point{};
+            point.x = GET_X_LPARAM(lParam);
+            point.y = GET_Y_LPARAM(lParam);
+
+            if (mouseMoveCallback_) {
+                mouseMoveCallback_(point);
+            }
+
+            return 0;
+        }
+
+        case WM_MOUSEWHEEL: {
+            POINT point{};
+            point.x = GET_X_LPARAM(lParam);
+            point.y = GET_Y_LPARAM(lParam);
+
+            ScreenToClient(hwnd_, &point);
+
+            const int wheelDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+
+            if (mouseWheelCallback_) {
+                mouseWheelCallback_(point, wheelDelta);
+            }
+
+            return 0;
+        }
 
         default:
             return DefWindowProcW(hwnd_, msg, wParam, lParam);
@@ -179,8 +291,4 @@ void CanvasHostWindow::paint() {
     PAINTSTRUCT ps{};
     BeginPaint(hwnd_, &ps);
     EndPaint(hwnd_, &ps);
-}
-
-void CanvasHostWindow::setLeftMouseDownCallback(MouseButtonCallback callback) {
-    leftMouseDownCallback_ = std::move(callback);
 }

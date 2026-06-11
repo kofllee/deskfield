@@ -46,7 +46,10 @@ WindowHitResult WindowHitTester::hitTest(
         }
 
         RECT titleRect = visualRect;
-        titleRect.bottom = std::max(titleRect.top + scaledTitleHeight, visualRect.bottom);
+        titleRect.bottom = std::min<LONG>(
+            titleRect.top + scaledTitleHeight,
+            visualRect.bottom
+        );
 
         if (containsPoint(titleRect, clientPoint)) {
             return WindowHitResult{

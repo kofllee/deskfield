@@ -74,6 +74,10 @@ public:
     void setCanvasRect(WindowId id, const CanvasRect& rect);
     void setState(WindowId id, DeskfieldWindowState state);
 
+    void clearSelection();
+    void selectWindow(WindowId id);
+    WindowId selectedWindowId() const;
+
     CanvasWindow* findById(WindowId id);
     const CanvasWindow* findById(WindowId id) const;
 
@@ -95,4 +99,5 @@ private:
 
 private:
     std::vector<CanvasWindow> windows_{};
+    WindowId selectedWindowId_{};
 };

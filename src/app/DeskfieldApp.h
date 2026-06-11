@@ -18,6 +18,7 @@
 
 #include "capture/GraphicsCaptureManager.h"
 
+#include "input/InputRouter.h"
 #include "input/WindowHitTester.h"
 
 #include "DeskfieldMode.h"
@@ -26,7 +27,6 @@
 
 #include <chrono>
 
-
 class DeskfieldApp {
 public:
     bool initialize();
@@ -34,15 +34,28 @@ public:
 
 private:
     void tick(double deltaSeconds);
-    void processInput(double deltaSeconds);
+
+    void processKeyboardShortcuts(double deltaSeconds);
     void processMessages(bool& shouldQuit);
+
     void syncWindows();
     void applyWindowStateChanges();
+
+    void applySourcePlacement();
     void renderCanvas();
 
     void handleCanvasLeftMouseDown(POINT clientPoint);
-    void activateCanvasWindow(WindowId id);
-    void clearNativeInteractionExcept(WindowId id);
+    void handleCanvasLeftMouseUp(POINT clientPoint);
+    void handleCanvasLeftMouseDoubleClick(POINT clientPoint);
+
+    void handleCanvasMiddleMouseDown(POINT clientPoint);
+    void handleCanvasMiddleMouseUp(POINT clientPoint);
+
+    void handleCanvasMouseMove(POINT clientPoint);
+    void handleCanvasMouseWheel(POINT clientPoint, int wheelDelta);
+
+    void enterNativeInteraction(WindowId id);
+    void leaveNativeInteractionExcept(WindowId id);
 
     void registerInitialWindows();
 
@@ -66,6 +79,7 @@ private:
     D3DCanvasRenderer d3dCanvasRenderer_{};
 
     WindowHitTester windowHitTester_{};
+    InputRouter inputRouter_{};
 
     CanvasCameraController cameraController_{};
 
@@ -74,5 +88,3 @@ private:
 
     int syncCounter_{0};
 };
-
-
